@@ -334,7 +334,7 @@ global $post, $wpdb;
     $shiphawk_shipping_origin = get_post_meta( $post->ID, 'shipping_origin', true );
 
     //TODO add loading gif http://duenorthstudios.com/how-do-you-use-wordpresss-built-in-waiting-loading-spinner/
-    //TODO РЅРµ РїРѕРєР°Р·С‹РІР°С‚СЊ РІ Р°РґРјРёРЅРєРµ РєР°СЃС‚РѕРјРЅС‹Рµ РїРѕСЃС‚ РјРµС‚Р° ?,
+    //TODO не показывать в админке кастомные пост мета ?,
 
     echo '<div id="shiphawk_product_data" class="panel woocommerce_options_panel wc-metaboxes-wrapper">
      <div class="wc-metabox">
@@ -573,9 +573,52 @@ function create_origins() {
             'rewrite' => array('slug' => 'origins'),
         )
     );
+
+
+
+    // Setup the author, slug, and title for the post
+    $author_id = 1;
+    $slug = 'origins';
+    $title = 'Default Origin';
+
+    // Check if origin post exist
+    if( null == get_origin_post('origins') ) {
+        wp_insert_post(
+            array(
+                'comment_status'	=>	'closed',
+                'ping_status'		=>	'closed',
+                'post_author'		=>	$author_id,
+                'post_name'		=>	$slug,
+                'post_title'		=>	$title,
+                'post_status'		=>	'publish',
+                'post_type'		=>	'origins'
+            )
+        );
+
+
+    }
+
 }
 // Hooking up our function to theme setup
 add_action( 'init', 'create_origins' );
+
+function get_origin_post($post_type) {
+    global $wpdb;
+
+    $sql = $wpdb->prepare( "
+			SELECT ID
+			FROM $wpdb->posts
+			WHERE post_type = %s
+			AND post_status = %s
+		", $post_type, 'publish' );
+
+    $origins = $wpdb->get_results( $sql );
+
+    if ( $origins )
+        return $origins;
+
+    return null;
+}
 
 add_action( 'add_meta_boxes', 'add_origin_fileds' );
 function add_origin_fileds() {

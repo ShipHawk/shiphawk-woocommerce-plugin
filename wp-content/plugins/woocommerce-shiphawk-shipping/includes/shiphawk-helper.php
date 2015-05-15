@@ -91,6 +91,7 @@ function getGroupedItemsByOrigin($items) {
     "Expedited White Glove Delivery (2-3 weeks)"
     */
 function _getServiceName($object) {
+
     if ( $object->summary->carrier_type == "Small Parcel" ) {
         return $object->summary->service;
     }
@@ -105,6 +106,10 @@ function _getServiceName($object) {
 
     if ( ( ( $object->summary->carrier_type == "LTL" ) || ( $object->summary->carrier_type == "3PL" ) || ( $object->summary->carrier_type == "Intermodal" ) ) && ($object->details->price->delivery > 0) ) {
         return "Expedited White Glove Delivery (2-3 weeks)";
+    }
+
+    if ( $object->summary->carrier_type == "Home Delivery" ) {
+        return "Home Delivery - " . $object->summary->service . " (1-2 weeks)";
     }
 
     return $object->summary->service;
