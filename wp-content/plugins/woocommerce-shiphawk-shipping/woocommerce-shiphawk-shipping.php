@@ -139,6 +139,11 @@ class shiphawk_shipping extends WC_Shipping_Method {
                 'title'         => __( 'Administrator email', 'woocommerce' ),
                 'type'          => 'text',
             ),
+            'origin_title' => array(
+                'title'         => __( 'Primary Origin Details', 'woocommerce' ),
+                'type'          => 'title',
+                'required'      => false,
+            ),
             'origin_first_name' => array(
                 'title'         => __( 'Origin First Name', 'woocommerce' ),
                 'type'          => 'text',
@@ -333,8 +338,6 @@ global $post, $wpdb;
 
     $shiphawk_shipping_origin = get_post_meta( $post->ID, 'shipping_origin', true );
 
-    //TODO add loading gif http://duenorthstudios.com/how-do-you-use-wordpresss-built-in-waiting-loading-spinner/
-    //TODO не показывать в админке кастомные пост мета ?,
 
     echo '<div id="shiphawk_product_data" class="panel woocommerce_options_panel wc-metaboxes-wrapper">
      <div class="wc-metabox">
@@ -353,6 +356,8 @@ global $post, $wpdb;
     echo '<tr><td><strong>Shipping origins:</strong></td>';
 
         echo '<td><select id="select_shipping_origin" name="shipping_origin">';
+                $default_origin_name = 'Primary';
+                echo '<option selected value="">' . $default_origin_name .  '</option>';
                 foreach ($shipping_origins as $origin) {
                     if ($origin->id == $shiphawk_shipping_origin) {
                         echo '<option selected value="' . $origin->id .'">' . $origin->post_title .  '</option>';
@@ -445,7 +450,7 @@ function my_admin_notice(){
         $ship_hawk_book_id = get_post_meta( $post->ID, 'ship_hawk_book_id', true );
         if (!$ship_hawk_book_id) {
         echo '<div class="error">
-             <p>Order not have ShipHawk book id yet.</p>
+             <p>Order does not have ShipHawk book Id.</p>
          </div>';
         }
     }
@@ -455,10 +460,10 @@ add_action('admin_notices', 'my_admin_notice');
 /**
  * Update the order meta with field value
  **/
-add_action('woocommerce_checkout_update_order_meta', 'my_custom_checkout_field_update_order_meta');
+add_action('woocommerce_checkout_update_order_meta', 'ShipHawk_custom_checkout_field_update_order_meta');
 
 /* auto book on checkout */
-function my_custom_checkout_field_update_order_meta( $order_id ) {
+function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
     global $woocommerce;
 
     $ship_hawk_order_id_arrays = $woocommerce->session->get('shiphawk_shipping_id');
@@ -576,49 +581,10 @@ function create_origins() {
 
 
 
-    // Setup the author, slug, and title for the post
-    $author_id = 1;
-    $slug = 'origins';
-    $title = 'Default Origin';
-
-    // Check if origin post exist
-    if( null == get_origin_post('origins') ) {
-        wp_insert_post(
-            array(
-                'comment_status'	=>	'closed',
-                'ping_status'		=>	'closed',
-                'post_author'		=>	$author_id,
-                'post_name'		=>	$slug,
-                'post_title'		=>	$title,
-                'post_status'		=>	'publish',
-                'post_type'		=>	'origins'
-            )
-        );
-
-
-    }
 
 }
 // Hooking up our function to theme setup
 add_action( 'init', 'create_origins' );
-
-function get_origin_post($post_type) {
-    global $wpdb;
-
-    $sql = $wpdb->prepare( "
-			SELECT ID
-			FROM $wpdb->posts
-			WHERE post_type = %s
-			AND post_status = %s
-		", $post_type, 'publish' );
-
-    $origins = $wpdb->get_results( $sql );
-
-    if ( $origins )
-        return $origins;
-
-    return null;
-}
 
 add_action( 'add_meta_boxes', 'add_origin_fileds' );
 function add_origin_fileds() {
