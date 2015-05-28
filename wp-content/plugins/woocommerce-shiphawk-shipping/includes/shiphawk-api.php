@@ -207,7 +207,7 @@ function process_shiphawk_book_manual( $order ) {
 
     //check if Book Id exist
     $ship_hawk_book_id = get_post_meta( $order->id, 'ship_hawk_book_id', true );
-    if ($ship_hawk_book_id) {
+    if (!empty($ship_hawk_book_id)) {
         return;
     }
 
