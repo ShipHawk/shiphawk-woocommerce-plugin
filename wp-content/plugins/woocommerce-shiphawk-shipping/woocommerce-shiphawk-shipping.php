@@ -262,6 +262,7 @@ class shiphawk_shipping extends WC_Shipping_Method {
             if($is_multi_origin) $rate_filter = 'best';
 
             $ship_rates = getShiphawkRate($from_zip, $to_zip, $_items, $rate_filter, $from_type);
+
             $shiphawk_shipping_rates[$origin_id]['ship_rates'] = $ship_rates;
             $shiphawk_shipping_rates[$origin_id]['items']= $_items;
 

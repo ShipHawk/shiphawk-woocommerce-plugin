@@ -57,9 +57,11 @@ function toBook($order_id, $rate_id, $order, $_items = array())
 
     // get origin id from first item
     $origin_id = $_items[0]['product_origin'];
-    $default_origin_address = getDefaultOriginAddress ();
+    $default_origin_address = getDefaultOriginAddress();
 
     $origin_address = getOriginAddress($origin_id);
+    $origin_address = ($origin_address) ? $origin_address  : $default_origin_address;
+
     $curl = curl_init();
 
     $next_bussines_day = date('Y-m-d', strtotime('now +1 Weekday'));
@@ -68,26 +70,18 @@ function toBook($order_id, $rate_id, $order, $_items = array())
         'order_email'=> $order_email,
         'xid'=>$order_id,
         'origin_address' =>
-            array(
-                'first_name' => ($origin_address['first_name']) ? $origin_address['first_name'] : $default_origin_address['first_name'],
-                'last_name' => ($origin_address['last_name']) ? $origin_address['last_name'] : $default_origin_address['last_name'],
-                'address_line_1' => ($origin_address['origin_address']) ? $origin_address['origin_address'] : $default_origin_address['origin_address'],
-                'address_line_2' => ($origin_address['origin_address2']) ? $origin_address['origin_address2'] : '',
-                'phone_num' => ($origin_address['origin_phone']) ? $origin_address['origin_phone'] : $default_origin_address['origin_phone'],
-                'city' => ($origin_address['origin_city']) ? $origin_address['origin_city'] : $default_origin_address['origin_city'],
-                'state' => ($origin_address['origin_state']) ? $origin_address['origin_state'] : $default_origin_address['origin_state'],
-                'zipcode' => ($origin_address['origin_zipcode']) ? $origin_address['origin_zipcode'] : $default_origin_address['origin_zipcode']
-            ),
+            $origin_address,
         'destination_address' =>
             array(
-                'first_name' => $order->shipping_first_name,
-                'last_name' => $order->shipping_last_name,
-                'address_line_1' => $order->shipping_address_1,
-                'address_line_2' => $order->shipping_address_2,
-                'phone_num' => $order->shipping_phone,
-                'city' => $order->shipping_city,
-                'state' => $order->shipping_state,
-                'zipcode' => $order->shipping_postcode
+                'first_name' => $order->billing_first_name,
+                'last_name' => $order->billing_last_name,
+                'address_line_1' => $order->billing_address_1,
+                'address_line_2' => $order->billing_address_2,
+                'phone_num' => $order->billing_phone,
+                'city' => $order->billing_city,
+                'state' => $order->billing_state,
+                'zipcode' => $order->billing_postcode,
+                'email' => $order->billing_email
             ),
         'billing_address' =>
             array(
@@ -98,7 +92,8 @@ function toBook($order_id, $rate_id, $order, $_items = array())
                 'phone_num' => $order->billing_phone,
                 'city' => $order->billing_city,
                 'state' => $order->billing_state,
-                'zipcode' => $order->billing_postcode
+                'zipcode' => $order->billing_postcode,
+                'email' => $order->billing_email
             ),
         'pickup' =>
             array(
@@ -226,15 +221,16 @@ function process_shiphawk_book_manual( $order ) {
         $product_width = round(convertToInchLbs(get_post_meta( $products['product_id'], '_width', true), $woocommerce_weight_unit), 2);
         $product_height = round(convertToInchLbs(get_post_meta( $products['product_id'], '_height', true), $woocommerce_dimension_unit), 2);
         $product_weight = round(convertToInchLbs(get_post_meta( $products['product_id'], '_weight', true), $woocommerce_weight_unit), 2);
+
         $product_price = (get_post_meta( $products['product_id'], '_sale_price', true)) ? (get_post_meta( $products['product_id'], '_sale_price', true)) : get_post_meta( $products['product_id'], '_regular_price', true);
         $items[] = array(
             'width' => $product_width,
             'length' => $product_length,
             'height' => $product_height,
             'weight' => $product_weight,
-            'value' => $product_price,
+            'value' => getShipHawkItemValue($products['product_id'],$product_price),
             'quantity' => $products['qty'],
-            'packed' => $plugin_settings['packing'],
+            'packed' => getIsPacked($products['product_id']),
             'id' => $pa_shiphawk_item_type_value,
             'product_id'=> $products['product_id'],
             'xid'=> $products['product_id'],
@@ -248,13 +244,14 @@ function process_shiphawk_book_manual( $order ) {
     $to_zip = $order->shipping_postcode;
 
     $rate_filter = $plugin_settings['rate_filter'];//consumer best
-    $from_type  = $plugin_settings['origin_location_type'];
-
 
     foreach ($grouped_items_by_origin as $origin_id=>$_items) {
         $from_zip = (get_post_meta( $origin_id, 'origin_zipcode', true )) ? get_post_meta( $origin_id, 'origin_zipcode', true ) : $plugin_settings['origin_zipcode'];
 
+        $from_type = (get_post_meta( $origin_id, 'origin_location_type', true )) ? get_post_meta( $origin_id, 'origin_location_type', true ) : $plugin_settings['origin_location_type'];
+
         if ($is_multiorigin) $rate_filter = 'best';
+
 
         $ship_rates = getShiphawkRate($from_zip, $to_zip, $_items, $rate_filter, $from_type);
 
