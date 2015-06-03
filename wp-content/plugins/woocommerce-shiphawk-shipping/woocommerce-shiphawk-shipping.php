@@ -224,6 +224,7 @@ class shiphawk_shipping extends WC_Shipping_Method {
 
             $woocommerce_dimension_unit = get_option('woocommerce_dimension_unit');
             $woocommerce_weight_unit = get_option('woocommerce_weight_unit');
+
             $product_origin = get_post_meta( $products['product_id'], 'shipping_origin', true );
 
 
@@ -232,15 +233,14 @@ class shiphawk_shipping extends WC_Shipping_Method {
                 'length' => round(convertToInchLbs($_product->length, $woocommerce_dimension_unit), 2),
                 'height' => round(convertToInchLbs($_product->height, $woocommerce_dimension_unit), 2),
                 'weight' => round(convertToInchLbs($products['data']->weight, $woocommerce_weight_unit), 2),
-                //'value' => $products['data']->price,
                 'value' => getShipHawkItemValue($products['product_id'],$products['data']->price),
                 'quantity' => $products['quantity'],
-                //'packed' => $this->packing,
                 'packed' => getIsPacked($products['product_id']),
                 'id' => $pa_shiphawk_item_type_value,
                 'product_id'=> $products['product_id'],
                 'xid'=> $products['product_id'],
-                'product_origin' => $product_origin
+                'product_origin' => $this->getProductOrigin($products['product_id']),
+                'zip_code' => $this->getProductOriginZip($products['product_id'])
             );
         }
 
@@ -249,7 +249,7 @@ class shiphawk_shipping extends WC_Shipping_Method {
         $to_zip = $woocommerce->customer->get_shipping_postcode();
 
         $rate_filter = $this->rate_filter;//consumer best
-        $from_type  = $this->origin_location_type;
+
 
         $is_multi_origin = (count($grouped_items_by_origin) > 1) ? true : false;
         $shiphawk_shipping_rates = array();
@@ -257,7 +257,12 @@ class shiphawk_shipping extends WC_Shipping_Method {
         $name_service = '';
         $summ_price = 0;
         foreach ($grouped_items_by_origin as $origin_id=>$_items) {
-            $from_zip = (get_post_meta( $origin_id, 'origin_zipcode', true )) ? get_post_meta( $origin_id, 'origin_zipcode', true ) : $this->origin_zipcode;
+
+            /* get origin zip from first product  */
+            $from_zip = $_items[0]['zip_code'];
+
+            //todo get origin location type from first product
+            $from_type  = $this->getProductOriginType($_items[0]['xid']);
 
             if($is_multi_origin) $rate_filter = 'best';
 
@@ -301,6 +306,49 @@ class shiphawk_shipping extends WC_Shipping_Method {
 
         WC()->session->set( 'shiphawk_shipping_id', $shiphawk_shipping_rates );
         WC()->session->set( 'is_multi_origin', $is_multi_origin );
+    }
+
+    public function getProductOriginZip($product_id) {
+
+        if (checkProductOriginAttributes($product_id)) {
+            return get_post_meta( $product_id, 'origin_zipcode', true );
+        }
+
+        $shipping_origin = get_post_meta( $product_id, 'shipping_origin', true );
+        if(!empty($shipping_origin)) {
+            return get_post_meta( $shipping_origin, 'origin_zipcode', true );
+        }
+
+        return $this->origin_zipcode;
+    }
+
+    public function getProductOriginType($product_id) {
+
+        if (checkProductOriginAttributes($product_id)) {
+            return get_post_meta( $product_id, 'origin_location_type', true );
+        }
+
+        $shipping_origin = get_post_meta( $product_id, 'shipping_origin', true );
+        if(!empty($shipping_origin)) {
+            return get_post_meta( $shipping_origin, 'origin_location_type', true );
+        }
+
+        return $this->origin_location_type;
+    }
+
+
+    public function getProductOrigin($product_id) {
+
+        if (checkProductOriginAttributes($product_id)) {
+            return 'per_product';
+        }
+
+        $shipping_origin = get_post_meta( $product_id, 'shipping_origin', true );
+        if(!empty($shipping_origin)) {
+            return get_post_meta( $shipping_origin, 'origin_zipcode', true );
+        }
+
+        return null;
     }
 
     public function admin_options() {
@@ -412,6 +460,110 @@ global $post, $wpdb;
 
     echo '</select></td></tr>';
 
+    echo '<tr><td class="attribute_name"><strong>Shipping Origin:</strong></td><td>';
+
+    /* ------ Shipping Origin -------- $required_origin_attributes = array('origin_first_name', 'origin_last_name', 'origin_address', 'origin_state', 'origin_city', 'origin_zipcode', 'origin_location_type', 'origin_phone', 'origin_email' ); */
+    echo '<tr>
+                <td class="attribute_name">
+                        <strong>Origin First Name:</strong>
+                    </td>
+                      <td>';
+    $shiphawk_first_name = get_post_meta( $post->ID, 'origin_first_name', true );
+    echo '<input type="text" name="origin_first_name" value="' . $shiphawk_first_name . '" id="origin_first_name" post_id="' . $post->ID  .'" >';
+    echo '<td></tr>';
+
+    echo '<tr>
+                <td class="attribute_name">
+                        <strong>Origin Last Name:</strong>
+                    </td>
+                      <td>';
+    $shiphawk_origin_last_name = get_post_meta( $post->ID, 'origin_last_name', true );
+    echo '<input type="text" name="origin_last_name" value="' . $shiphawk_origin_last_name . '" id="origin_last_name" post_id="' . $post->ID  .'" >';
+    echo '<td></tr>';
+
+    echo '<tr>
+                <td class="attribute_name">
+                        <strong>Origin Address:</strong>
+                    </td>
+                      <td>';
+    $shiphawk_origin_address = get_post_meta( $post->ID, 'origin_address', true );
+    echo '<input type="text" name="origin_address" value="' . $shiphawk_origin_address . '" id="origin_address" post_id="' . $post->ID  .'" >';
+    echo '<td></tr>';
+
+    echo '<tr>
+                <td class="attribute_name">
+                        <strong>Origin Address Line 2:</strong>
+                    </td>
+                      <td>';
+    $shiphawk_origin_address2 = get_post_meta( $post->ID, 'origin_address2', true );
+    echo '<input type="text" name="origin_address2" value="' . $shiphawk_origin_address2 . '" id="origin_address2" post_id="' . $post->ID  .'" >';
+    echo '<td></tr>';
+
+    echo '<tr>
+                <td class="attribute_name">
+                        <strong>Origin City:</strong>
+                    </td>
+                      <td>';
+    $shiphawk_origin_city = get_post_meta( $post->ID, 'origin_city', true );
+    echo '<input type="text" name="origin_city" value="' . $shiphawk_origin_city . '" id="origin_city" post_id="' . $post->ID  .'" >';
+    echo '<td></tr>';
+
+    echo '<tr>
+                <td class="attribute_name">
+                        <strong>Origin State:</strong>
+                    </td>
+                      <td>';
+    $shiphawk_origin_state = get_post_meta( $post->ID, 'origin_state', true );
+    echo '<input type="text" name="origin_state" value="' . $shiphawk_origin_state . '" id="origin_state" post_id="' . $post->ID  .'" >';
+    echo '<td></tr>';
+
+    echo '<tr>
+                <td class="attribute_name">
+                        <strong>Origin Zip Code:</strong>
+                    </td>
+                      <td>';
+    $shiphawk_origin_zipcode = get_post_meta( $post->ID, 'origin_zipcode', true );
+    echo '<input type="text" name="origin_zipcode" value="' . $shiphawk_origin_zipcode . '" id="origin_zipcode" post_id="' . $post->ID  .'" >';
+    echo '<td></tr>';
+
+    //location type
+
+    echo '<tr>
+                <td class="attribute_name">
+                        <strong>Origin Phone:</strong>
+                    </td>
+                      <td>';
+    $shiphawk_origin_phone = get_post_meta( $post->ID, 'origin_phone', true );
+    echo '<input type="text" name="origin_phone" value="' . $shiphawk_origin_phone . '" id="origin_phone" post_id="' . $post->ID  .'" >';
+    echo '<td></tr>';
+
+    echo '<tr>
+                <td class="attribute_name">
+                        <strong>Origin Email:</strong>
+                    </td>
+                      <td>';
+    $shiphawk_origin_email = get_post_meta( $post->ID, 'origin_email', true );
+    echo '<input type="text" name="origin_email" value="' . $shiphawk_origin_email . '" id="origin_email" post_id="' . $post->ID  .'" >';
+    echo '<td></tr>';
+
+    echo '<tr><td><strong>Origin Location Type:</strong></td>';
+
+    echo '<td><select id="origin_location_type" name="origin_location_type">';
+    $shiphawk_origin_location_type = get_post_meta( $post->ID, 'origin_location_type', true );
+
+    if ($shiphawk_origin_location_type == 'commercial') {
+        echo '<option selected value="commercial">commercial</option>';
+    }else{
+        echo '<option  value="commercial">commercial</option>';
+    }
+    if ($shiphawk_origin_location_type == 'residential') {
+        echo '<option selected value="residential">residential</option>';
+    }else{
+        echo '<option  value="residential">residential</option>';
+    }
+
+    echo '</select></td></tr>';
+
             echo '</tbody>
         </table>';
 
@@ -470,9 +622,6 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
     $ship_hawk_order_id_arrays = $woocommerce->session->get('shiphawk_shipping_id');
     $is_multiorigin = $woocommerce->session->get('is_multi_origin');
 
-    //$woocommerce->session->__unset('shiphawk_shipping_id');
-    //$woocommerce->session->__unset('is_multi_origin');
-   // $order = get_post($order_id);
     $order = new WC_Order( $order_id );
 
     $shipping_method = $order->get_shipping_method();
@@ -490,8 +639,9 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
                     // check price
                     if ($shipping_rate->summary->price == $shipping_amount) {
                     update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
+                    $_items  =  $origin_id['items'];
 
-                    $book_id = toBook($order_id, $shipping_rate->id, $order );
+                    $book_id = toBook($order_id, $shipping_rate->id, $order, $_items );
 
                     if($book_id->shipment_id) {
                         update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->shipment_id);
@@ -508,7 +658,9 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
                 }else {
                     update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
 
-                    $book_id = toBook($order_id, $shipping_rate->id, $order, $origin_id['items']);
+                    $_items  =  $origin_id['items'];
+
+                    $book_id = toBook($order_id, $shipping_rate->id, $order, $_items);
 
                     if($book_id->shipment_id) {
                         update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->shipment_id);
@@ -598,7 +750,6 @@ function shiphawk_shipping_origin_fields( $post ) {
     $origin_first_name = get_post_meta( $post->ID, 'origin_first_name', true);
     echo '<ul>';
     echo 'First Name';
-
     ?>
     <li>
     <input type="text" required name="origin_first_name" value="<?php echo esc_attr( $origin_first_name ); ?>" />
@@ -705,7 +856,7 @@ function save_shipping_origins_meta( $post_ID ) {
         }
     }
 
-    //save origins
+    //save product shihawk origin
     if( $post->post_type == "product" ) {
         if (isset( $_POST ) ) {
             update_post_meta( $post_ID, 'shipping_origin', strip_tags( $_POST['shipping_origin'] ) );
@@ -714,6 +865,19 @@ function save_shipping_origins_meta( $post_ID ) {
             update_post_meta( $post_ID, 'shiphawk_item_value', strip_tags( $_POST['shiphawk_item_value'] ) );
             update_post_meta( $post_ID, 'origin_email', strip_tags( $_POST['shiphawk_number_of_item'] ) );
             update_post_meta( $post_ID, 'shiphawk_item_is_packed', strip_tags( $_POST['shiphawk_item_is_packed'] ) );
+
+
+            /* origins */
+            update_post_meta( $post_ID, 'origin_first_name', strip_tags( $_POST['origin_first_name'] ) );
+            update_post_meta( $post_ID, 'origin_last_name', strip_tags( $_POST['origin_last_name'] ) );
+            update_post_meta( $post_ID, 'origin_address', strip_tags( $_POST['origin_address'] ) );
+            update_post_meta( $post_ID, 'origin_state', strip_tags( $_POST['origin_state'] ) );
+            update_post_meta( $post_ID, 'origin_city', strip_tags( $_POST['origin_city'] ) );
+            update_post_meta( $post_ID, 'origin_zipcode', strip_tags( $_POST['origin_zipcode'] ) );
+            update_post_meta( $post_ID, 'origin_location_type', strip_tags( $_POST['origin_location_type'] ) );
+            update_post_meta( $post_ID, 'origin_phone', strip_tags( $_POST['origin_phone'] ) );
+            update_post_meta( $post_ID, 'origin_email', strip_tags( $_POST['origin_email'] ) );
+            /* origins */
 
         }
     }
@@ -740,13 +904,3 @@ function save_shipping_origins_meta( $post_ID ) {
     $item_value = ($item_value > 0) ? $item_value : $price_value;
     return $item_value;
 }
-
-
-// curl -X POST http://www.woohawk.devigor.wdgtest.com/wc-api/v2/orders/57/notes -u ck_3ce3722f84e5978aacdeebeac51edbd9:cs_7d2ab7c29e9bcd077685beb918b7eb2e -H "Content-Type: application/json" -d '{  "order_note": {  "note": "Order ok!!!" }}'
-//curl -X POST http://www.woohawk.devigor.wdgtest.com/wc-api/v2/orders/57/notes -u ck_3ce3722f84e5978aacdeebeac51edbd9:cs_7d2ab7c29e9bcd077685beb918b7eb2e -H "Content-Type: application/json" -d '{  "order_note": {  "note": "Order ok!!!" }}'
-
-
-//magento
-////curl -X POST -H Content-Type:application/json -d '{"event":"shipment.status_update","status":"in_transit","updated_at":"2015-01-14T10:43:16.702-08:00","shipment_id":1010226}' http://shiphawk.devigor.wdgtest.com/index.php/shiphawk/index/tracking?api_key=3331b35952ec7d99338a1cc5c496b55c
-
-

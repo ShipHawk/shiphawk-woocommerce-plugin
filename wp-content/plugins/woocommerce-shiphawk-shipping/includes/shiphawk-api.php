@@ -42,7 +42,7 @@ function getShiphawkRate($from_zip, $to_zip, $items, $rate_filter,$from_type) {
     return $arr_res;
 }
 
-function toBook($order_id, $rate_id, $order, $_items = array())
+function toBook($order_id, $rate_id, $order, $_items)
 {
     $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
 
@@ -57,10 +57,9 @@ function toBook($order_id, $rate_id, $order, $_items = array())
 
     // get origin id from first item
     $origin_id = $_items[0]['product_origin'];
-    $default_origin_address = getDefaultOriginAddress();
 
-    $origin_address = getOriginAddress($origin_id);
-    $origin_address = ($origin_address) ? $origin_address  : $default_origin_address;
+
+    $origin_address = getOriginAddress($origin_id, $_items[0]['xid']);
 
     $curl = curl_init();
 
@@ -73,14 +72,14 @@ function toBook($order_id, $rate_id, $order, $_items = array())
             $origin_address,
         'destination_address' =>
             array(
-                'first_name' => $order->billing_first_name,
-                'last_name' => $order->billing_last_name,
-                'address_line_1' => $order->billing_address_1,
-                'address_line_2' => $order->billing_address_2,
+                'first_name' => $order->shipping_first_name,
+                'last_name' => $order->shipping_last_name,
+                'address_line_1' => $order->shipping_address_1,
+                'address_line_2' => $order->shipping_address_2,
                 'phone_num' => $order->billing_phone,
-                'city' => $order->billing_city,
-                'state' => $order->billing_state,
-                'zipcode' => $order->billing_postcode,
+                'city' => $order->shipping_city,
+                'state' => $order->shipping_state,
+                'zipcode' => $order->shipping_postcode,
                 'email' => $order->billing_email
             ),
         'billing_address' =>
@@ -246,8 +245,10 @@ function process_shiphawk_book_manual( $order ) {
     $rate_filter = $plugin_settings['rate_filter'];//consumer best
 
     foreach ($grouped_items_by_origin as $origin_id=>$_items) {
+        // PER PRODUCT
         $from_zip = (get_post_meta( $origin_id, 'origin_zipcode', true )) ? get_post_meta( $origin_id, 'origin_zipcode', true ) : $plugin_settings['origin_zipcode'];
 
+        // PER PRODUCT
         $from_type = (get_post_meta( $origin_id, 'origin_location_type', true )) ? get_post_meta( $origin_id, 'origin_location_type', true ) : $plugin_settings['origin_location_type'];
 
         if ($is_multiorigin) $rate_filter = 'best';

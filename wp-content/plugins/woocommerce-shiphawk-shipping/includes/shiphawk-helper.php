@@ -49,28 +49,52 @@ function getDefaultOriginAddress () {
     $origin_address['state']           = $plugin_settings['origin_state'];
     $origin_address['city']        = $plugin_settings['origin_city'];
     $origin_address['zipcode']         = $plugin_settings['origin_zipcode'];
-    //$origin_address['origin_location_type']           = $plugin_settings['origin_location_type'];
+    $origin_address['origin_location_type']           = $plugin_settings['origin_location_type'];
     $origin_address['phone_num']           = $plugin_settings['origin_phone'];
     $origin_address['email']           = $plugin_settings['origin_email'];
 
     return $origin_address;
 }
 
-function getOriginAddress ($origin_id) {
+function getOriginAddress ($origin_id, $product_id) {
     $origin_address = array();
 
-    $origin_address['first_name']          = get_post_meta( $origin_id, 'origin_first_name', true);
-    $origin_address['last_name']           = get_post_meta( $origin_id, 'origin_last_name', true);
-    $origin_address['address_line_1']         = get_post_meta( $origin_id, 'origin_address', true);
-    $origin_address['address_line_2']         = get_post_meta( $origin_id, 'origin_address2', true);
-    $origin_address['state']           = get_post_meta( $origin_id, 'origin_state', true);
-    $origin_address['city']        = get_post_meta( $origin_id, 'origin_city', true);
-    $origin_address['zipcode']         = get_post_meta( $origin_id, 'origin_zipcode', true);
-    //$origin_address['origin_location_type']           = get_post_meta( $origin_id, 'origin_location_type', true);
-    $origin_address['phone_num']           = get_post_meta( $origin_id, 'origin_phone', true);
-    $origin_address['email']           = get_post_meta( $origin_id, 'origin_email', true);
+    $default_origin_address = getDefaultOriginAddress();
 
-    return $origin_address;
+    /* if product has all required origin attributes */
+    if (checkProductOriginAttributes($product_id)) {
+        $origin_address['first_name']          = get_post_meta( $product_id, 'origin_first_name', true);
+        $origin_address['last_name']           = get_post_meta( $product_id, 'origin_last_name', true);
+        $origin_address['address_line_1']         = get_post_meta( $product_id, 'origin_address', true);
+        $origin_address['address_line_2']         = (get_post_meta( $product_id, 'origin_address2', true)) ? get_post_meta( $product_id, 'origin_address2', true) : '';
+        $origin_address['state']           = get_post_meta( $product_id, 'origin_state', true);
+        $origin_address['city']        = get_post_meta( $product_id, 'origin_city', true);
+        $origin_address['zipcode']         = get_post_meta( $product_id, 'origin_zipcode', true);
+        $origin_address['origin_location_type']           = get_post_meta( $product_id, 'origin_location_type', true);
+        $origin_address['phone_num']           = get_post_meta( $product_id, 'origin_phone', true);
+        $origin_address['email']           = get_post_meta( $product_id, 'origin_email', true);
+
+        return $origin_address;
+    }
+
+    /* if product has origin id, get origin attributes from origin */
+    if($origin_id) {
+
+        $origin_address['first_name']          = get_post_meta( $origin_id, 'origin_first_name', true);
+        $origin_address['last_name']           = get_post_meta( $origin_id, 'origin_last_name', true);
+        $origin_address['address_line_1']         = get_post_meta( $origin_id, 'origin_address', true);
+        $origin_address['address_line_2']         = (get_post_meta( $origin_id, 'origin_address2', true)) ? get_post_meta( $origin_id, 'origin_address2', true) : '';
+        $origin_address['state']           = get_post_meta( $origin_id, 'origin_state', true);
+        $origin_address['city']        = get_post_meta( $origin_id, 'origin_city', true);
+        $origin_address['zipcode']         = get_post_meta( $origin_id, 'origin_zipcode', true);
+        $origin_address['origin_location_type']           = get_post_meta( $origin_id, 'origin_location_type', true);
+        $origin_address['phone_num']           = get_post_meta( $origin_id, 'origin_phone', true);
+        $origin_address['email']           = get_post_meta( $origin_id, 'origin_email', true);
+
+        return $origin_address;
+    }
+
+    return $default_origin_address;
 }
 
 function getGroupedItemsByOrigin($items) {
@@ -81,7 +105,15 @@ function getGroupedItemsByOrigin($items) {
     return $tmp;
 }
 
-/*
+function getGroupedItemsByZip($items) {
+    $tmp = array();
+    foreach($items as $item) {
+        $tmp[$item['zip_code']][] = $item;
+    }
+    return $tmp;
+}
+
+    /*
     1. If carrier_type = "Small Parcel" display name should be what's included in field [Service] (example: Ground)
     2. If carrier_type = "Blanket Wrap" display name should be:
     "Standard White Glove Delivery (3-6 weeks)"
@@ -113,4 +145,18 @@ function _getServiceName($object) {
     }
 
     return $object->summary->service;
+}
+
+function checkProductOriginAttributes( $product_id ) {
+    $required_origin_attributes = array('origin_first_name', 'origin_last_name', 'origin_address', 'origin_state', 'origin_city', 'origin_zipcode', 'origin_location_type', 'origin_phone', 'origin_email' );
+
+    foreach ($required_origin_attributes as $origin_attribute) {
+        $origin_attribute_value = get_post_meta( $product_id, $origin_attribute, true);
+        if(empty($origin_attribute_value)) {
+            return false;
+        }
+    }
+
+    return true;
+
 }
