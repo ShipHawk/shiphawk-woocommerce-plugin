@@ -113,38 +113,38 @@ function getGroupedItemsByZip($items) {
     return $tmp;
 }
 
-    /*
-    1. If carrier_type = "Small Parcel" display name should be what's included in field [Service] (example: Ground)
-    2. If carrier_type = "Blanket Wrap" display name should be:
-    "Standard White Glove Delivery (3-6 weeks)"
-    3. If carrier_type = "LTL","3PL","Intermodal" AND delivery field inside [details][price]=$0.00 display name should be:
-    "Curbside delivery (1-2 weeks)"
-    4. If carrier_type = "LTL","3PL" "Intermodal" AND delivery field inside [details][price] > $0.00 display name should be:
-    "Expedited White Glove Delivery (2-3 weeks)"
-    */
+/*
+1. If carrier_type = "Small Parcel" display name should be what's included in field [Service] (example: Ground)
+2. If carrier_type = "Blanket Wrap" display name should be:
+"Standard White Glove Delivery (3-6 weeks)"
+3. If carrier_type = "LTL","3PL","Intermodal" AND delivery field inside [details][price]=$0.00 display name should be:
+"Curbside delivery (1-2 weeks)"
+4. If carrier_type = "LTL","3PL" "Intermodal" AND delivery field inside [details][price] > $0.00 display name should be:
+"Expedited White Glove Delivery (2-3 weeks)"
+*/
 function _getServiceName($object) {
 
-    if ( $object->summary->carrier_type == "Small Parcel" ) {
-        return $object->summary->service;
+    if ( $object->shipping->service == "Small Parcel" ) {
+        return $object->shipping->service;
     }
 
-    if ( $object->summary->carrier_type == "Blanket Wrap" ) {
+    if ( $object->shipping->carrier_type == "Blanket Wrap" ) {
         return "Standard White Glove Delivery (3-6 weeks)";
     }
 
-    if ( ( ( $object->summary->carrier_type == "LTL" ) || ( $object->summary->carrier_type == "3PL" ) || ( $object->summary->carrier_type == "Intermodal" ) ) && ($object->details->price->delivery == 0) ) {
+    if ( ( ( $object->shipping->carrier_type == "LTL" ) || ( $object->shipping->carrier_type == "3PL" ) || ( $object->shipping->carrier_type == "Intermodal" ) ) && ($object->delivery->price == 0) ) {
         return "Curbside delivery (1-2 weeks)";
     }
 
-    if ( ( ( $object->summary->carrier_type == "LTL" ) || ( $object->summary->carrier_type == "3PL" ) || ( $object->summary->carrier_type == "Intermodal" ) ) && ($object->details->price->delivery > 0) ) {
+    if ( ( ( $object->shipping->carrier_type == "LTL" ) || ( $object->shipping->carrier_type == "3PL" ) || ( $object->shipping->carrier_type == "Intermodal" ) ) && ($object->delivery->price > 0) ) {
         return "Expedited White Glove Delivery (2-3 weeks)";
     }
 
-    if ( $object->summary->carrier_type == "Home Delivery" ) {
-        return "Home Delivery - " . $object->summary->service . " (1-2 weeks)";
+    if ( $object->shipping->carrier_type == "Home Delivery" ) {
+        return "Home Delivery - " . $object->shipping->service . " (1-2 weeks)";
     }
 
-    return $object->summary->service;
+    return $object->shipping->service;
 }
 
 function checkProductOriginAttributes( $product_id ) {
@@ -159,4 +159,18 @@ function checkProductOriginAttributes( $product_id ) {
 
     return true;
 
+}
+
+/*
+ * log function
+ *  */
+function wlog($var) {
+    $var_str = var_export($var, true);
+    $var = "<?php\n\n\$ = $var_str;\n\n?>";
+    $file = plugin_dir_path( __FILE__ ) . '/wlog.php';
+    file_put_contents($file, $var);
+}
+
+function getPrice($object) {
+    return $object->shipping->price + $object->packing->price + $object->pickup->price + $object->delivery->price + $object->insurance->price;
 }

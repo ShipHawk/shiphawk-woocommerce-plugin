@@ -90,10 +90,10 @@ class shiphawk_shipping extends WC_Shipping_Method {
                     'title'         => __( 'Gateway Mode', 'woocommerce' ),
                     'type'          => 'select',
                     'description'   => '',
-                    'default'       => 'https://shiphawk.com/api/v1/',
+                    'default'       => 'https://shiphawk.com/api/v3/',
                     'options'       => array(
-                        'https://shiphawk.com/api/v1/'  => __( 'Live', 'woocommerce' ),
-                        'https://sandbox.shiphawk.com/api/v1/'      => __( 'Sandbox', 'woocommerce' ),
+                        'https://shiphawk.com/api/v3/'  => __( 'Live', 'woocommerce' ),
+                        'https://sandbox.shiphawk.com/api/v3/'      => __( 'Sandbox', 'woocommerce' ),
                     ),
                 ),
             'rate_filter' => array(
@@ -251,62 +251,75 @@ class shiphawk_shipping extends WC_Shipping_Method {
 
         $rate_filter = $this->rate_filter;//consumer best
 
-
         $is_multi_origin = (count($grouped_items_by_origin) > 1) ? true : false;
         $shiphawk_shipping_rates = array();
 
         $name_service = '';
         $summ_price = 0;
+        $shiphawk_error = false;
         foreach ($grouped_items_by_origin as $origin_id=>$_items) {
 
             /* get origin zip from first product  */
             $from_zip = $_items[0]['zip_code'];
 
-            //todo get origin location type from first product
+            /* get origin location type from first product */
             $from_type  = $this->getProductOriginType($_items[0]['xid']);
 
             if($is_multi_origin) $rate_filter = 'best';
 
             $ship_rates = getShiphawkRate($from_zip, $to_zip, $_items, $rate_filter, $from_type);
 
-            $shiphawk_shipping_rates[$origin_id]['ship_rates'] = $ship_rates;
-            $shiphawk_shipping_rates[$origin_id]['items']= $_items;
+            if(is_object($ship_rates)) {
+                if($ship_rates->error) {
+                    wlog($ship_rates->error);
+                    $shiphawk_error = true;
+                }
+            }else{
+                $shiphawk_shipping_rates[$origin_id]['ship_rates'] = $ship_rates;
+                $shiphawk_shipping_rates[$origin_id]['items']= $_items;
 
-            foreach ($ship_rates as $ship_rate) {
+                foreach ($ship_rates as $ship_rate) {
 
                     $shipping_label = _getServiceName($ship_rate);
                     $shipping_rate_id = str_replace(' ', '_', $shipping_label);
                     $rate = array(
                         'id' => $shipping_rate_id,
                         'label' => $shipping_label,
-                        'cost' => $ship_rate->summary->price,
+                        'cost' => getPrice($ship_rate),
                         'taxes' => '',
                         'calc_tax' => "per_order"
                     );
-                if (!$is_multi_origin) {
-                    $this->add_rate( $rate );
-                }else{
-                    //$name_service .= $shipping_label . ', ';
-                    $summ_price += $ship_rate->summary->price;
+                    if (!$is_multi_origin) {
+                        $this->add_rate( $rate );
+                    }else{
+                        //$name_service .= $shipping_label . ', ';
+                        $summ_price += getPrice($ship_rate);
+                    }
                 }
             }
+
         }
 
-        if ($is_multi_origin) {
-            $name_service = 'Shipping from multiple locations';
-            $shipping_rate_id = str_replace(' ', '_', $name_service);
-            $rate = array(
-                'id' => $shipping_rate_id,
-                'label' => $name_service,
-                'cost' => $summ_price,
-                'taxes' => '',
-                'calc_tax' => "per_order"
-            );
-            $this->add_rate( $rate );
+        if($shiphawk_error) {
+            //some error from shiphawk
+        }else{
+            if ($is_multi_origin) {
+                $name_service = 'Shipping from multiple locations';
+                $shipping_rate_id = str_replace(' ', '_', $name_service);
+                $rate = array(
+                    'id' => $shipping_rate_id,
+                    'label' => $name_service,
+                    'cost' => $summ_price,
+                    'taxes' => '',
+                    'calc_tax' => "per_order"
+                );
+                $this->add_rate( $rate );
+            }
+
+            WC()->session->set( 'shiphawk_shipping_id', $shiphawk_shipping_rates );
+            WC()->session->set( 'is_multi_origin', $is_multi_origin );
         }
 
-        WC()->session->set( 'shiphawk_shipping_id', $shiphawk_shipping_rates );
-        WC()->session->set( 'is_multi_origin', $is_multi_origin );
     }
 
     public function getProductOriginZip($product_id) {
@@ -631,56 +644,73 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
 
     $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
 
-    if ($plugin_settings['manual_shipping'] == '0') {
         foreach ($ship_hawk_order_id_arrays as $origin_id) {
             foreach ($origin_id['ship_rates'] as $shipping_rate) {
 
                 //if ($shipping_rate->summary->service == $shipping_method) {
                 if (!$is_multiorigin) {
                     // check price
-                    if ($shipping_rate->summary->price == $shipping_amount) {
-                    update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
-                    $_items  =  $origin_id['items'];
+                    if (round(getPrice($shipping_rate),3) == round($shipping_amount,3)) {
+                        //package info
+                        $package_info = $shipping_rate->shipping->service . ': ';
+                        foreach($shipping_rate->packing->packages as $package) {
+                            $package_info .= $package->dimensions->length . 'x' . $package->dimensions->width . 'x' . $package->dimensions->height . ', ' . $package->dimensions->weight . 'lbs ,';
+                        }
 
-                    $book_id = toBook($order_id, $shipping_rate->id, $order, $_items );
+                        //update_post_meta( $order_id, 'package_info', $package_info);
+                        add_post_meta($order_id, 'package_info', $package_info);
 
-                    if($book_id->shipment_id) {
-                        update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->shipment_id);
-                        $order->add_order_note( __( 'Book Id: ' . $book_id->shipment_id, 'woocommerce' ) );
-                    }
+                        if ($plugin_settings['manual_shipping'] == '0') {
+                                update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
 
-                    if ($book_id->shipment_id) {
-                        SubscribeToTrackInfo($book_id->shipment_id, $order);
-                    }else{
-                        $order->add_order_note( __( 'No ShipHawk id ', 'woocommerce' ) );
-                    }
+                                $_items  =  $origin_id['items'];
 
+                                $book_id = toBook($order_id, $shipping_rate->id, $order, $_items );
+
+                                if($book_id->details->id) {
+                                    update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
+                                    $order->add_order_note( __( 'Book Id: ' . $book_id->details->id, 'woocommerce' ) );
+                                }
+
+                                if ($book_id->details->id) {
+                                    SubscribeToTrackInfo($book_id->details->id, $order);
+                                }else{
+                                    $order->add_order_note( __( 'No ShipHawk id ', 'woocommerce' ) );
+                                }
+                        }
                     }
                 }else {
-                    update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
 
-                    $_items  =  $origin_id['items'];
-
-                    $book_id = toBook($order_id, $shipping_rate->id, $order, $_items);
-
-                    if($book_id->shipment_id) {
-                        update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->shipment_id);
-                        $order->add_order_note( __( 'Book Id: ' . $book_id->shipment_id, 'woocommerce' ) );
+                    //package info
+                    $package_info = $shipping_rate->shipping->service . ': ';
+                    foreach($shipping_rate->packing->packages as $package) {
+                        $package_info .= $package->dimensions->length . 'x' . $package->dimensions->width . 'x' . $package->dimensions->height . ', ' . $package->dimensions->weight . 'lbs ,';
                     }
 
-                    if ($book_id->shipment_id) {
-                        SubscribeToTrackInfo($book_id->shipment_id, $order);
-                    }else{
-                        $order->add_order_note( __( 'No ShipHawk id ', 'woocommerce' ) );
+                    //update_post_meta( $order_id, 'package_info', $package_info);
+                    add_post_meta($order_id, 'package_info', $package_info);
+
+                    if ($plugin_settings['manual_shipping'] == '0') {
+                        update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
+                        $_items  =  $origin_id['items'];
+
+                        $book_id = toBook($order_id, $shipping_rate->id, $order, $_items);
+
+                        if($book_id->details->id) {
+                            update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
+                            $order->add_order_note( __( 'Book Id: ' . $book_id->details->id, 'woocommerce' ) );
+                        }
+
+                        if ($book_id->details->id) {
+                            SubscribeToTrackInfo($book_id->details->id, $order);
+                        }else{
+                            $order->add_order_note( __( 'No ShipHawk id ', 'woocommerce' ) );
+                        }
                     }
                 }
 
             }
-        }
-
     }
-
-
 }
 
 
@@ -732,9 +762,6 @@ function create_origins() {
             'rewrite' => array('slug' => 'origins'),
         )
     );
-
-
-
 
 }
 // Hooking up our function to theme setup
@@ -867,11 +894,18 @@ function save_shipping_origins_meta( $post_ID ) {
             update_post_meta( $post_ID, 'origin_email', strip_tags( $_POST['shiphawk_number_of_item'] ) );
             update_post_meta( $post_ID, 'shiphawk_item_is_packed', strip_tags( $_POST['shiphawk_item_is_packed'] ) );
 
+            update_post_meta( $post_ID, 'shiphawk_item_is_packed', strip_tags( $_POST['shiphawk_item_is_packed'] ) );
+
+            update_post_meta( $post_ID, 'shiphawk_product_item_type', strip_tags( $_POST['shiphawk_type_of_product'] ) );
+
+            //shiphawk_product_item_type
 
             /* origins */
             update_post_meta( $post_ID, 'origin_first_name', strip_tags( $_POST['origin_first_name'] ) );
             update_post_meta( $post_ID, 'origin_last_name', strip_tags( $_POST['origin_last_name'] ) );
             update_post_meta( $post_ID, 'origin_address', strip_tags( $_POST['origin_address'] ) );
+            update_post_meta( $post_ID, 'origin_address2', strip_tags( $_POST['origin_address2'] ) );
+
             update_post_meta( $post_ID, 'origin_state', strip_tags( $_POST['origin_state'] ) );
             update_post_meta( $post_ID, 'origin_city', strip_tags( $_POST['origin_city'] ) );
             update_post_meta( $post_ID, 'origin_zipcode', strip_tags( $_POST['origin_zipcode'] ) );

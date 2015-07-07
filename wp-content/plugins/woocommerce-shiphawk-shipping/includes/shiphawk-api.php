@@ -10,10 +10,8 @@ function getShiphawkRate($from_zip, $to_zip, $items, $rate_filter,$from_type) {
 
     $api_key = $plugin_settings['api_key'];
     $api_url = $plugin_settings['gateway_mode'];
-    //$url_api_rates = 'https://sandbox.shiphawk.com/api/v1/rates/full?api_key=3331b35952ec7d99338a1cc5c496b55c';
 
-    //$url_api_rates = $api_url . 'rates/full?api_key=' . $api_key;
-    $url_api_rates = $api_url . 'rates/standard?api_key=' . $api_key;
+    $url_api_rates = $api_url . 'rates?api_key=' . $api_key;
     $curl = curl_init();
 
     $items_array = array(
@@ -48,7 +46,9 @@ function toBook($order_id, $rate_id, $order, $_items)
 
     $api_key = $plugin_settings['api_key'];
     $api_url = $plugin_settings['gateway_mode'];
-    $url_api = $api_url . 'shipments/book?api_key=' . $api_key;
+    $url_api = $api_url . 'shipments?api_key=' . $api_key;
+
+    wlog($url_api);
 
     $order_email = $order->billing_email;
     if ($plugin_settings['receipts_to'] == 'administrator') {
@@ -138,7 +138,7 @@ function my_action_callback() {
     $api_key = $plugin_settings['api_key'];
     $api_url = $plugin_settings['gateway_mode'];
 
-    $url_api = $api_url . 'items/search/' . $search_tag . '?api_key=' . $api_key;
+    $url_api = $api_url . 'items/search?q=' . $search_tag . '&api_key=' . $api_key;
 
     $curl = curl_init();
 
@@ -158,7 +158,7 @@ function my_action_callback() {
         $responce['shiphawk_error'] = $arr_res->error;
     }else{
         foreach ((array) $arr_res as $el) {
-            $responce_array[$el->id] = $el->name.' ('.$el->category.')';
+            $responce_array[$el->id] = $el->name.' ('.$el->category_name.')';
         }
 
         $responce_html="<ul>";
@@ -260,18 +260,18 @@ function process_shiphawk_book_manual( $order ) {
         foreach ($ship_rates as $shipping_rate) {
             if (!$is_multiorigin) {
                 // check price
-                if ($shipping_rate->summary->price == $shipping_amount) {
+                if (round(getPrice($shipping_rate),3) == round($shipping_amount,3)) {
                     update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
 
                     $book_id = toBook($order_id, $shipping_rate->id, $order, $_items);
 
-                    if($book_id->shipment_id) {
-                        update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->shipment_id);
-                        $order->add_order_note( __( 'Book Id: ' . $book_id->shipment_id, 'woocommerce' ) );
+                    if($book_id->details->id) {
+                        update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
+                        $order->add_order_note( __( 'Book Id: ' . $book_id->details->id, 'woocommerce' ) );
                     }
 
-                    if ($book_id->shipment_id) {
-                        SubscribeToTrackInfo($book_id->shipment_id, $order);
+                    if ($book_id->details->id) {
+                        SubscribeToTrackInfo($book_id->details->id, $order);
                     }else{
                         $order->add_order_note( __( 'No ShipHawk id ', 'woocommerce' ) );
                     }
@@ -282,15 +282,19 @@ function process_shiphawk_book_manual( $order ) {
 
                 $book_id = toBook($order_id, $shipping_rate->id, $order, $_items);
 
-                if($book_id->shipment_id) {
-                    update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->shipment_id);
-                    $order->add_order_note( __( 'Book Id: ' . $book_id->shipment_id, 'woocommerce' ) );
+                if($book_id->details->id) {
+                    update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
+                    $order->add_order_note( __( 'Book Id: ' . $book_id->details->id, 'woocommerce' ) );
                 }
 
-                if ($book_id->shipment_id) {
-                    SubscribeToTrackInfo($book_id->shipment_id, $order);
+                if ($book_id->details->id) {
+                    SubscribeToTrackInfo($book_id->details->id, $order);
                 }else{
                     $order->add_order_note( __( 'No ShipHawk id ', 'woocommerce' ) );
+                    if($book_id->error) {
+                        $order->add_order_note( __( $book_id->error, 'woocommerce' ) );
+                    }
+
                 }
             }
         }
@@ -306,7 +310,8 @@ function SubscribeToTrackInfo($ship_hawk_book_id, $order) {
     $api_key = $plugin_settings['api_key'];
     $api_url = $plugin_settings['gateway_mode'];
 
-    $subscribe_url = $api_url . 'shipments/' . $ship_hawk_book_id . '/subscribe?api_key=' . $api_key;
+    $subscribe_url = $api_url . 'shipments/' . $ship_hawk_book_id . '/tracking?api_key=' . $api_key;
+
     //TODO subscribe url = http://www.woohawk.devigor.wdgtest.com/wp-content/plugins/woocommerce-shiphawk-shipping/interface.php?api_key=344
     $callback_url = 'http://www.woohawk.devigor.wdgtest.com/wp-content/plugins/woocommerce-shiphawk-shipping/interface.php';
 
