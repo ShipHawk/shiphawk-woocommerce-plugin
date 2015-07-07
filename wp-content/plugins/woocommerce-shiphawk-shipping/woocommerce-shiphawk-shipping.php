@@ -71,13 +71,14 @@ class shiphawk_shipping extends WC_Shipping_Method {
                 'label'         => __( 'Enable this shipping method', 'woocommerce' ),
                 'default'       => 'no',
                                     ),
-            /*'title' => array(
+            'title' => array(
                 'title'         => __( 'Method Title', 'woocommerce' ),
                 'type'          => 'text',
+                'disabled'          => true,
                 'description'   => __( 'This controls the title which the user sees during checkout.', 'woocommerce' ),
                 'default'       => __( 'ShipHawk Shipping', 'woocommerce' ),
                 'required'      => true,
-                                    ),*/
+                                    ),
             'api_key' => array(
                 'title'         => __( 'Api Key', 'woocommerce' ),
                 'type'          => 'text',
