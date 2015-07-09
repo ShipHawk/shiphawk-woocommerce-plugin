@@ -199,3 +199,13 @@ function getDiscountShippingPrice($price) {
     }
     return $price;
 }
+
+/*
+ * log function
+ *  */
+function wlog($var, $file_name = 'wlog.php') {
+    $var_str = var_export($var, true);
+    $var = "<?php\n\n\$ = $var_str;\n\n?>";
+    $file = plugin_dir_path( __FILE__ ) . '/' . $file_name;
+    file_put_contents($file, $var);
+}

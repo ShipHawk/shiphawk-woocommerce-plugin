@@ -2,7 +2,7 @@
 /*
 Plugin Name: ShipHawk Shipping
 Description: ShipHawk Shipping for Woocommerce.
-Version: 1.1
+Version: 1.2
 Author: ShipHawk
 Author URI: https://shiphawk.com/
 */
@@ -305,14 +305,14 @@ class shiphawk_shipping extends WC_Shipping_Method {
 
                     //check cart threshold
 
-                    $shipping_price = getPrice($ship_rate);
+                    $shipping_price = $shipping_original_price = getPrice($ship_rate);
 
                     if($cart_content_total >= $cart_threshold) {
                         $shipping_price = getDiscountShippingPrice($shipping_price);
                     }
 
                     $shipping_label = _getServiceName($ship_rate);
-                    $shipping_rate_id = str_replace(' ', '_', $shipping_label);
+                    $shipping_rate_id = str_replace(' ', '_', $shipping_label) . $shipping_original_price;
                     $rate = array(
                         'id' => $shipping_rate_id,
                         'label' => $shipping_label,
