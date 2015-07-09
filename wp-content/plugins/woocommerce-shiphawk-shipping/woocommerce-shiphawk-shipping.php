@@ -140,6 +140,27 @@ class shiphawk_shipping extends WC_Shipping_Method {
                 'title'         => __( 'Administrator email', 'woocommerce' ),
                 'type'          => 'text',
             ),
+
+            'cart_threshold' => array(
+                'title'         => __( 'Cart threshold', 'woocommerce' ),
+                'type'          => 'text',
+                'default'       => 0.00,
+            ),
+
+            'discount_fixed' => array(
+                'title'         => __( 'Markup or Discount Flat Amount', 'woocommerce' ),
+                'type'          => 'text',
+                'default'       => 0,
+                'description'   => __( 'possible values from -∞ to ∞', 'woocommerce' ),
+            ),
+
+            'discount_percentage' => array(
+                'title'         => __( 'Markup or Discount Percentage', 'woocommerce' ),
+                'type'          => 'text',
+                'default'       => 0,
+                'description'   => __( 'possible values from -100 to 100', 'woocommerce' ),
+            ),
+
             'origin_title' => array(
                 'title'         => __( 'Primary Origin Details', 'woocommerce' ),
                 'type'          => 'title',
@@ -215,6 +236,10 @@ class shiphawk_shipping extends WC_Shipping_Method {
         global $woocommerce;
         $cart_objct = $woocommerce->cart;
 
+        $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
+        $cart_content_total = $cart_objct->cart_contents_total;
+        $cart_threshold = $plugin_settings['cart_threshold'];
+
         $items = array();
         foreach ($cart_objct->cart_contents as $products) {
 
@@ -227,7 +252,6 @@ class shiphawk_shipping extends WC_Shipping_Method {
             $woocommerce_weight_unit = get_option('woocommerce_weight_unit');
 
             $product_origin = get_post_meta( $products['product_id'], 'shipping_origin', true );
-
 
             $items[] = array(
                 'width' => round(convertToInchLbs($_product->width, $woocommerce_dimension_unit), 2),
@@ -271,7 +295,6 @@ class shiphawk_shipping extends WC_Shipping_Method {
 
             if(is_object($ship_rates)) {
                 if($ship_rates->error) {
-                    wlog($ship_rates->error);
                     $shiphawk_error = true;
                 }
             }else{
@@ -280,12 +303,20 @@ class shiphawk_shipping extends WC_Shipping_Method {
 
                 foreach ($ship_rates as $ship_rate) {
 
+                    //check cart threshold
+
+                    $shipping_price = getPrice($ship_rate);
+
+                    if($cart_content_total >= $cart_threshold) {
+                        $shipping_price = getDiscountShippingPrice($shipping_price);
+                    }
+
                     $shipping_label = _getServiceName($ship_rate);
                     $shipping_rate_id = str_replace(' ', '_', $shipping_label);
                     $rate = array(
                         'id' => $shipping_rate_id,
                         'label' => $shipping_label,
-                        'cost' => getPrice($ship_rate),
+                        'cost' => $shipping_price,
                         'taxes' => '',
                         'calc_tax' => "per_order"
                     );
@@ -293,7 +324,7 @@ class shiphawk_shipping extends WC_Shipping_Method {
                         $this->add_rate( $rate );
                     }else{
                         //$name_service .= $shipping_label . ', ';
-                        $summ_price += getPrice($ship_rate);
+                        $summ_price += $shipping_price;
                     }
                 }
             }
@@ -614,8 +645,8 @@ function my_admin_notice(){
     global $pagenow, $post;
 
     if (( $pagenow == 'post.php' ) && (get_post_type( $post ) == 'shop_order')) {
-        $ship_hawk_book_id = get_post_meta( $post->ID, 'ship_hawk_book_id', true );
-        if (!$ship_hawk_book_id) {
+        $ship_hawk_book_id = get_post_meta( $post->ID, 'ship_hawk_book_id' );
+        if (!count($ship_hawk_book_id)>0) {
         echo '<div class="error">
              <p>Order does not have ShipHawk book Id.</p>
          </div>';
@@ -644,6 +675,8 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
 
     $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
 
+    $book_ids = array();
+
         foreach ($ship_hawk_order_id_arrays as $origin_id) {
             foreach ($origin_id['ship_rates'] as $shipping_rate) {
 
@@ -660,6 +693,7 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
                         //update_post_meta( $order_id, 'package_info', $package_info);
                         add_post_meta($order_id, 'package_info', $package_info);
 
+                        // manual shipping - NO
                         if ($plugin_settings['manual_shipping'] == '0') {
                                 update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
 
@@ -668,7 +702,8 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
                                 $book_id = toBook($order_id, $shipping_rate->id, $order, $_items );
 
                                 if($book_id->details->id) {
-                                    update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
+                                    //update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
+                                    $book_ids[] = $book_id->details->id;
                                     $order->add_order_note( __( 'Book Id: ' . $book_id->details->id, 'woocommerce' ) );
                                 }
 
@@ -679,7 +714,7 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
                                 }
                         }
                     }
-                }else {
+                } else {
 
                     //package info
                     $package_info = $shipping_rate->shipping->service . ': ';
@@ -690,6 +725,7 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
                     //update_post_meta( $order_id, 'package_info', $package_info);
                     add_post_meta($order_id, 'package_info', $package_info);
 
+                    //// manual shipping - NO
                     if ($plugin_settings['manual_shipping'] == '0') {
                         update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
                         $_items  =  $origin_id['items'];
@@ -697,7 +733,8 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
                         $book_id = toBook($order_id, $shipping_rate->id, $order, $_items);
 
                         if($book_id->details->id) {
-                            update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
+                            //update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
+                            $book_ids[] = $book_id->details->id;
                             $order->add_order_note( __( 'Book Id: ' . $book_id->details->id, 'woocommerce' ) );
                         }
 
@@ -710,12 +747,15 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
                 }
 
             }
+
+            if(count($book_ids)>0) {
+                add_post_meta( $order_id, 'ship_hawk_book_id', $book_ids);
+            }
     }
 }
 
 
 add_filter( 'woocommerce_shipping_methods', 'add_shiphawk_shipping' );
-
 
 
 /**
@@ -729,13 +769,34 @@ function my_custom_checkout_field_display_admin_order_meta($order){
     $ship_hawk_order_id = get_post_meta( $order_id, 'ship_hawk_order_id', true );
     $ship_hawk_book_id = get_post_meta( $order_id, 'ship_hawk_book_id', true );
 
-    echo '<p><strong>'.__('ShipHawk order id').':</strong> ' . $ship_hawk_order_id . '</p>';
-    echo '<p><strong>'.__('ShipHawk book id').':</strong> ' . $ship_hawk_book_id . '</p>';
+    //echo '<p><strong>'.__('ShipHawk order id').':</strong> ' . $ship_hawk_order_id . '</p>';
+    //echo '<p><strong>'.__('ShipHawk book id').':</strong> ' . $ship_hawk_book_id . '</p>';
 }
+
+
+/**
+ * Add get BOL button
+ **/
+function get_BOL_PDF_action($order){
+
+    $order_id = $order->id;
+
+    $ship_hawk_book_ids = get_post_meta( $order_id, 'ship_hawk_book_id', true );
+
+    //1016194 test book id with
+    //$ship_hawk_book_id = 1016194;
+    if(count($ship_hawk_book_ids)>0) {
+        foreach($ship_hawk_book_ids as $ship_hawk_book_id) {
+            echo '<a onclick="getBolPdf(this)" class="bol_link" id="' . $ship_hawk_book_id .'">Get BOL PDF for ' . $ship_hawk_book_id .' shipment</a></br>';
+        }
+    }
+
+}
+
+add_action( 'woocommerce_admin_order_data_after_billing_address', 'get_BOL_PDF_action', 10, 1);
 
 // add our own item to the order actions meta box
 add_action( 'woocommerce_order_actions', 'add_order_meta_box_actions' );
-
 // define the item in the meta box by adding an item to the $actions array
 function add_order_meta_box_actions( $actions ) {
     $actions['shiphawk_book_manual'] = __( 'ShipHawk Book' );
@@ -839,7 +900,6 @@ function shiphawk_shipping_origin_fields( $post ) {
                 <option value="commercial" <?php echo (esc_attr( $origin_location_type ) == 'commercial') ? 'selected' : ''; ?>>commercial</option>
                 <option value="residential" <?php echo (esc_attr( $origin_location_type ) == 'residential') ? 'selected' : ''; ?>>residential</option>
             </select>
-
         </li>
         <?php
 
@@ -937,5 +997,5 @@ function save_shipping_origins_meta( $post_ID ) {
         $price_value = $product_price;
     }
     $item_value = ($item_value > 0) ? $item_value : $price_value;
-    return $item_value;
+    return round($item_value,3);
 }

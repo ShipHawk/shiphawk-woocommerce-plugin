@@ -48,8 +48,6 @@ function toBook($order_id, $rate_id, $order, $_items)
     $api_url = $plugin_settings['gateway_mode'];
     $url_api = $api_url . 'shipments?api_key=' . $api_key;
 
-    wlog($url_api);
-
     $order_email = $order->billing_email;
     if ($plugin_settings['receipts_to'] == 'administrator') {
         $order_email = $plugin_settings['shiphawk_admin_email'];
@@ -192,6 +190,44 @@ function set_item_type_callback() {
     wp_die();
 }
 
+// get BOL pdf todo
+add_action( 'wp_ajax_get_bolpdf', 'get_bolpdf_callback' );
+function get_bolpdf_callback() {
+
+    $book_id = $_POST['book_id'];
+
+    $upload_dir = wp_upload_dir();
+
+    $responce['bol_url']= '';
+    $responce['shiphawk_error'] = '';
+
+    $responce_BOL = getBOLpdf($book_id);
+
+    if ($responce_BOL->url) {
+        //$io = new Varien_Io_File();
+        //$path_to_save_bol_pdf = Mage::getBaseDir('media'). DS .'shiphawk'. DS .'bol';
+        $path_to_save_bol_pdf = $upload_dir['path'];
+        $BOLpdf = $path_to_save_bol_pdf . '/' .  $book_id . '.pdf';
+
+        if (file_get_contents($BOLpdf)) {
+            $responce['bol_url'] = $upload_dir['url'] . '/' . $book_id . '.pdf';
+        }else{
+            file_put_contents($BOLpdf, file_get_contents($responce_BOL->url));
+            //$responce = file_get_contents($BOLpdf);
+            $responce['bol_url'] = $responce['bol_url'] = $upload_dir['url'] . '/' . $book_id . '.pdf';
+        }
+
+    }else{
+        $responce['shiphawk_error'] = $responce_BOL->error;
+    }
+
+    //$responce['shiphawk_error'] = 'error';
+
+    echo json_encode($responce);
+
+    wp_die();
+}
+
 add_action( 'woocommerce_order_action_shiphawk_book_manual', 'process_shiphawk_book_manual' );
 
 /* Manual Book */
@@ -238,11 +274,13 @@ function process_shiphawk_book_manual( $order ) {
     }
 
     $grouped_items_by_origin = getGroupedItemsByOrigin($items);
+
     $is_multiorigin = (count($grouped_items_by_origin) > 1) ? true : false;
 
     $to_zip = $order->shipping_postcode;
 
     $rate_filter = $plugin_settings['rate_filter'];//consumer best
+    $book_ids = array();
 
     foreach ($grouped_items_by_origin as $origin_id=>$_items) {
         // PER PRODUCT
@@ -255,8 +293,8 @@ function process_shiphawk_book_manual( $order ) {
 
 
         $ship_rates = getShiphawkRate($from_zip, $to_zip, $_items, $rate_filter, $from_type);
-
         //if ($shipping_rate->summary->service == $shipping_method) {
+
         foreach ($ship_rates as $shipping_rate) {
             if (!$is_multiorigin) {
                 // check price
@@ -266,8 +304,9 @@ function process_shiphawk_book_manual( $order ) {
                     $book_id = toBook($order_id, $shipping_rate->id, $order, $_items);
 
                     if($book_id->details->id) {
-                        update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
+                        //update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
                         $order->add_order_note( __( 'Book Id: ' . $book_id->details->id, 'woocommerce' ) );
+                        $book_ids[] = $book_id->details->id;
                     }
 
                     if ($book_id->details->id) {
@@ -283,8 +322,9 @@ function process_shiphawk_book_manual( $order ) {
                 $book_id = toBook($order_id, $shipping_rate->id, $order, $_items);
 
                 if($book_id->details->id) {
-                    update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
+                    //update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
                     $order->add_order_note( __( 'Book Id: ' . $book_id->details->id, 'woocommerce' ) );
+                    $book_ids[] = $book_id->details->id;
                 }
 
                 if ($book_id->details->id) {
@@ -298,7 +338,10 @@ function process_shiphawk_book_manual( $order ) {
                 }
             }
         }
+    }
 
+    if(count($book_ids)>0) {
+        add_post_meta( $order_id, 'ship_hawk_book_id', $book_ids);
     }
 
 }
@@ -323,7 +366,7 @@ function SubscribeToTrackInfo($ship_hawk_book_id, $order) {
     $items_array =  json_encode($items_array);
 
     curl_setopt($curl, CURLOPT_URL, $subscribe_url);
-    curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "POST");
+    curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "PUT");
     curl_setopt($curl, CURLOPT_POSTFIELDS, $items_array);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($curl, CURLOPT_HTTPHEADER, array(
@@ -346,4 +389,26 @@ function SubscribeToTrackInfo($ship_hawk_book_id, $order) {
 
     }
     curl_close($curl);
+}
+
+/* get url to BOL pdf from shiphawk */
+function getBOLpdf($shipment_id) {
+
+    $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
+
+    $api_key = $plugin_settings['api_key'];
+    $api_url = $plugin_settings['gateway_mode'];
+
+    $bol_url = $api_url . 'shipments/' . $shipment_id . '/bol?api_key=' . $api_key;
+
+    $curl = curl_init();
+
+    curl_setopt($curl, CURLOPT_URL, $bol_url);
+    curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "GET");
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+
+    $resp = curl_exec($curl);
+    $arr_res = json_decode($resp);
+
+    return $arr_res;
 }

@@ -6,3 +6,8 @@
 #shiphawk_product_data .wc-metabox {
 
 }
+
+.bol_link {
+    cursor: pointer;
+    text-decoration: underline;
+}

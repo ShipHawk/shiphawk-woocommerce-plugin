@@ -57,10 +57,44 @@ function setItemid(el) {
         'post_id': post_id
     };
 
-    // We can also pass the url value separately from ajaxurl for front end AJAX implementations
     jQuery.post(ajax_object.ajax_url, data, function(response) {
-//TODO add loading gif
+
+    //TODO add loading gif
         var obj_responce = jQuery.parseJSON(response);
 
     });
+}
+
+function getBolPdf(element){
+    var bookid = element.id;
+
+    var data = {
+        'action': 'get_bolpdf', // wp_ajax_my_action где my_action часть после wp_ajax_  !
+        'book_id': bookid
+    };
+
+    jQuery.post(ajax_object.ajax_url, data, function(response) {
+
+        var obj_responce = jQuery.parseJSON(response);
+
+        if(obj_responce.shiphawk_error) {
+
+            var error_html = 'ERROR: ' + obj_responce.shiphawk_error;
+            alert(error_html);
+        }else{
+            if(obj_responce.bol_url) {
+
+                // alert(responce_html.bol_url);
+                //window.location = responce_html.bol_url;
+
+                window.open(
+                    obj_responce.bol_url,
+                    '_blank' // <- This is what makes it open in a new window.
+                );
+
+            }
+        }
+
+    });
+
 }

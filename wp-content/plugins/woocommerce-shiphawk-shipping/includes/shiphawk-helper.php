@@ -161,16 +161,41 @@ function checkProductOriginAttributes( $product_id ) {
 
 }
 
-/*
- * log function
- *  */
-function wlog($var) {
-    $var_str = var_export($var, true);
-    $var = "<?php\n\n\$ = $var_str;\n\n?>";
-    $file = plugin_dir_path( __FILE__ ) . '/wlog.php';
-    file_put_contents($file, $var);
-}
-
 function getPrice($object) {
     return $object->shipping->price + $object->packing->price + $object->pickup->price + $object->delivery->price + $object->insurance->price;
+}
+
+function discountPercentage($price) {
+
+    $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
+    $discountPercentage = $plugin_settings['discount_percentage'];
+
+    if(!empty($discountPercentage)) {
+        $price = $price + ($price * ($discountPercentage/100));
+    }
+
+
+    return $price;
+}
+
+function discountFixed($price) {
+
+    $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
+    $discountFixed = $plugin_settings['discount_fixed'];
+
+    if(!empty($discountFixed)) {
+        $price = $price + ($discountFixed);
+    }
+
+    return $price;
+}
+
+function getDiscountShippingPrice($price) {
+    $price = discountPercentage($price);
+    $price = discountFixed($price);
+
+    if($price <= 0) {
+        return 0;
+    }
+    return $price;
 }
