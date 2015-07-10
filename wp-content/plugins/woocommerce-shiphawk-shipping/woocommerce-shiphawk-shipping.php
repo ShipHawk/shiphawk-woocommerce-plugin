@@ -2,7 +2,7 @@
 /*
 Plugin Name: ShipHawk Shipping
 Description: ShipHawk Shipping for Woocommerce.
-Version: 1.2
+Version: 1.3
 Author: ShipHawk
 Author URI: https://shiphawk.com/
 */
@@ -667,6 +667,11 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
     $ship_hawk_order_id_arrays = $woocommerce->session->get('shiphawk_shipping_id');
     $is_multiorigin = $woocommerce->session->get('is_multi_origin');
 
+
+    // shipping code with shipping original amount
+    $shipping_code = (string) $_POST['shipping_method'][0];
+    add_post_meta($order_id, 'shipping_code_original_amount', $shipping_code);
+
     $order = new WC_Order( $order_id );
 
     $shipping_method = $order->get_shipping_method();
@@ -683,7 +688,10 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
                 //if ($shipping_rate->summary->service == $shipping_method) {
                 if (!$is_multiorigin) {
                     // check price
-                    if (round(getPrice($shipping_rate),3) == round($shipping_amount,3)) {
+                    $shipping_price_from_rate = (string) round(getPrice($shipping_rate),2);
+
+                    if (getOriginalShipHawkShippingPrice($shipping_code, $shipping_price_from_rate)) {
+                    //if (round(getPrice($shipping_rate),3) == round($shipping_amount,3)) {
                         //package info
                         $package_info = $shipping_rate->shipping->service . ': ';
                         foreach($shipping_rate->packing->packages as $package) {

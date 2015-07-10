@@ -174,7 +174,6 @@ function discountPercentage($price) {
         $price = $price + ($price * ($discountPercentage/100));
     }
 
-
     return $price;
 }
 
@@ -197,7 +196,13 @@ function getDiscountShippingPrice($price) {
     if($price <= 0) {
         return 0;
     }
+
     return $price;
+}
+
+function getOriginalShipHawkShippingPrice($shipping_code, $shipping_method_price) {
+    $result = strpos($shipping_code, $shipping_method_price);
+    return $result;
 }
 
 /*

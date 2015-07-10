@@ -282,6 +282,9 @@ function process_shiphawk_book_manual( $order ) {
     $rate_filter = $plugin_settings['rate_filter'];//consumer best
     $book_ids = array();
 
+    $shipping_code = (string) get_post_meta( $order_id, 'shipping_code_original_amount', true );
+
+
     foreach ($grouped_items_by_origin as $origin_id=>$_items) {
         // PER PRODUCT
         $from_zip = (get_post_meta( $origin_id, 'origin_zipcode', true )) ? get_post_meta( $origin_id, 'origin_zipcode', true ) : $plugin_settings['origin_zipcode'];
@@ -297,8 +300,13 @@ function process_shiphawk_book_manual( $order ) {
 
         foreach ($ship_rates as $shipping_rate) {
             if (!$is_multiorigin) {
+
+
+                //if (round(getPrice($shipping_rate),3) == round($shipping_amount,3)) {
                 // check price
-                if (round(getPrice($shipping_rate),3) == round($shipping_amount,3)) {
+                $shipping_price_from_rate = (string) round(getPrice($shipping_rate),2);
+
+                if (getOriginalShipHawkShippingPrice($shipping_code, $shipping_price_from_rate)) {
                     update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
 
                     $book_id = toBook($order_id, $shipping_rate->id, $order, $_items);
