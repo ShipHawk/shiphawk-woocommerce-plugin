@@ -211,6 +211,10 @@ function getOriginalShipHawkShippingPrice($shipping_code, $shipping_method_price
 function wlog($var, $file_name = 'wlog.php') {
     $var_str = var_export($var, true);
     $var = "<?php\n\n\$ = $var_str;\n\n?>";
-    $file = plugin_dir_path( __FILE__ ) . '/' . $file_name;
-    file_put_contents($file, $var);
+    $file = plugin_dir_path( __FILE__ ) . '/log/' . $file_name;
+    //file_put_contents($file, $var);
+    $f = fopen($file, 'a+');
+    fwrite($f, $var);
+    fclose($f);
+    chmod($file, 0777);
 }

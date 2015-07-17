@@ -22,7 +22,7 @@ function init_shiphawk_shipping() {
     
 class shiphawk_shipping extends WC_Shipping_Method {
 
-    function __construct() { 
+    function __construct() {
      
         $this->id           = 'shiphawk_shipping';
         $this->method_title         = __( 'ShipHawk Shipping', 'woocommerce' );
@@ -65,6 +65,7 @@ class shiphawk_shipping extends WC_Shipping_Method {
     function init_form_fields() {
 
         $this->form_fields = array(
+
             'enabled' => array(
                 'title'         => __( 'Enable/Disable', 'woocommerce' ),
                 'type'          => 'checkbox',
@@ -281,6 +282,7 @@ class shiphawk_shipping extends WC_Shipping_Method {
         $name_service = '';
         $summ_price = 0;
         $shiphawk_error = false;
+
         foreach ($grouped_items_by_origin as $origin_id=>$_items) {
 
             /* get origin zip from first product  */
@@ -397,10 +399,16 @@ class shiphawk_shipping extends WC_Shipping_Method {
     }
 
     public function admin_options() {
+        //work only in admin page
+        $shiphawk_plugin_version = '';
+        if(is_admin()) {
+            $plugin_version = get_plugin_data( __FILE__  );
+            $shiphawk_plugin_version = $plugin_version['Version'];
+        }
 
         ?>
         <h3><?php _e('ShipHawk Shipping', 'woocommerce'); ?></h3>
-        <p><?php _e('ShipHawk Shipping', 'woocommerce'); ?></p>
+        <p><?php _e('Version ' . $shiphawk_plugin_version, 'woocommerce'); ?></p>
         <table class="form-table">
         <?php
         // Generate the HTML For the settings form.
@@ -645,7 +653,7 @@ function my_admin_notice(){
     global $pagenow, $post;
 
     if (( $pagenow == 'post.php' ) && (get_post_type( $post ) == 'shop_order')) {
-        $ship_hawk_book_id = get_post_meta( $post->ID, 'ship_hawk_book_id' );
+        $ship_hawk_book_id = get_post_meta( $post->ID, 'ship_hawk_book_id', true );
         if (!count($ship_hawk_book_id)>0) {
         echo '<div class="error">
              <p>Order does not have ShipHawk book Id.</p>
@@ -667,10 +675,9 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
     $ship_hawk_order_id_arrays = $woocommerce->session->get('shiphawk_shipping_id');
     $is_multiorigin = $woocommerce->session->get('is_multi_origin');
 
-
     // shipping code with shipping original amount
     $shipping_code = (string) $_POST['shipping_method'][0];
-    add_post_meta($order_id, 'shipping_code_original_amount', $shipping_code);
+    add_post_meta($order_id, '_shipping_code_original_amount', $shipping_code);
 
     $order = new WC_Order( $order_id );
 
@@ -757,7 +764,7 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
             }
 
             if(count($book_ids)>0) {
-                add_post_meta( $order_id, 'ship_hawk_book_id', $book_ids);
+                add_post_meta( $order_id, 'ship_hawk_book_id', $book_ids, true);
             }
     }
 }
@@ -966,8 +973,6 @@ function save_shipping_origins_meta( $post_ID ) {
 
             update_post_meta( $post_ID, 'shiphawk_product_item_type', strip_tags( $_POST['shiphawk_type_of_product'] ) );
 
-            //shiphawk_product_item_type
-
             /* origins */
             update_post_meta( $post_ID, 'origin_first_name', strip_tags( $_POST['origin_first_name'] ) );
             update_post_meta( $post_ID, 'origin_last_name', strip_tags( $_POST['origin_last_name'] ) );
@@ -993,7 +998,6 @@ function save_shipping_origins_meta( $post_ID ) {
     $product_is_packed = ($product_is_packed == 2) ? $default_is_packed : $product_is_packed;
 
     return ($product_is_packed ? 'true' : 'false');
-    //return $product_is_packed;
 }
 
  function getShipHawkItemValue($product_id, $product_price) {
@@ -1006,4 +1010,69 @@ function save_shipping_origins_meta( $post_ID ) {
     }
     $item_value = ($item_value > 0) ? $item_value : $price_value;
     return round($item_value,3);
+}
+
+//add_action( 'shiphawk_status_update','update_shipments_status' );
+
+// put this line inside a function,
+// presumably in response to something the user does
+// otherwise it will schedule a new event on every page visit
+
+//wp_schedule_single_event( time() + 3600*6, 'shiphawk_status_update' );
+//wp_schedule_single_event( time() + 120, 'shiphawk_status_update' );
+
+// time() + 3600 = one hour from now.
+// time() + 3600*6  = six hour from now.
+
+//On plugin activation schedule
+register_activation_hook( __FILE__, 'shiphawk_shiphawk_status_shipment_update' );
+function shiphawk_shiphawk_status_shipment_update(){
+    //Use wp_next_scheduled to check if the event is already scheduled
+    $timestamp = wp_next_scheduled( 'sh_status_update' );
+
+
+    if( $timestamp == false ){
+
+        wp_schedule_event( time(), 'twicedaily', 'sh_status_update' );
+    }
+}
+
+
+add_action( 'sh_status_update', 'update_shipments_status' );
+function update_shipments_status() {
+    global $wpdb;
+    //1016671
+
+    $shipping_orders = $wpdb->get_results( "SELECT id, post_title FROM {$wpdb->prefix}posts WHERE (post_type = 'shop_order')AND(post_status <> 'trash')" );
+
+    wlog(date('l jS \of F Y h:i:s A'), 'timelog.log');
+
+    foreach ($shipping_orders as $order) {
+
+        $ship_hawk_book_ids = get_post_meta( $order->id, 'ship_hawk_book_id', true );
+        wlog($ship_hawk_book_ids);
+
+        if (count($ship_hawk_book_ids) > 0) {
+
+            foreach ($ship_hawk_book_ids as $book_id) {
+
+                $status_response = getShipmentStatus($book_id);
+
+                if($status_response->status) {
+                    
+                    $current_shipment_status = get_post_meta( $order->id, 'current_status_of_shipment');
+                    wlog($order->id, 'status.log');
+                    wlog($current_shipment_status, 'status.log');
+
+                    if($current_shipment_status<>$status_response->status) {
+                        update_post_meta($order->id, 'current_status_of_shipment', $status_response->status);
+                        $order = new WC_Order($order->id);
+                        $status_message = $book_id . ' - ' . 'status has been changed to: ' . $status_response->status;
+                        $order->add_order_note($status_message);
+                    }
+
+                }
+            }
+        }
+    }
 }

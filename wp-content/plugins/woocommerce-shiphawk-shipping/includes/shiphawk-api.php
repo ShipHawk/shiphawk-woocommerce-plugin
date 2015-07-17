@@ -190,7 +190,7 @@ function set_item_type_callback() {
     wp_die();
 }
 
-// get BOL pdf todo
+// get BOL pdf
 add_action( 'wp_ajax_get_bolpdf', 'get_bolpdf_callback' );
 function get_bolpdf_callback() {
 
@@ -237,6 +237,7 @@ function process_shiphawk_book_manual( $order ) {
 
     //check if Book Id exist
     $ship_hawk_book_id = get_post_meta( $order->id, 'ship_hawk_book_id', true );
+
     if (!empty($ship_hawk_book_id)) {
         return;
     }
@@ -282,8 +283,7 @@ function process_shiphawk_book_manual( $order ) {
     $rate_filter = $plugin_settings['rate_filter'];//consumer best
     $book_ids = array();
 
-    $shipping_code = (string) get_post_meta( $order_id, 'shipping_code_original_amount', true );
-
+    $shipping_code = (string) get_post_meta( $order_id, '_shipping_code_original_amount', true );
 
     foreach ($grouped_items_by_origin as $origin_id=>$_items) {
         // PER PRODUCT
@@ -301,15 +301,16 @@ function process_shiphawk_book_manual( $order ) {
         foreach ($ship_rates as $shipping_rate) {
             if (!$is_multiorigin) {
 
-
                 //if (round(getPrice($shipping_rate),3) == round($shipping_amount,3)) {
                 // check price
                 $shipping_price_from_rate = (string) round(getPrice($shipping_rate),2);
+                wlog($shipping_price_from_rate, 'ssssss5');
 
                 if (getOriginalShipHawkShippingPrice($shipping_code, $shipping_price_from_rate)) {
                     update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
 
                     $book_id = toBook($order_id, $shipping_rate->id, $order, $_items);
+                    wlog($book_id, 'ssssss3');
 
                     if($book_id->details->id) {
                         //update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
@@ -349,7 +350,7 @@ function process_shiphawk_book_manual( $order ) {
     }
 
     if(count($book_ids)>0) {
-        add_post_meta( $order_id, 'ship_hawk_book_id', $book_ids);
+        add_post_meta( $order_id, 'ship_hawk_book_id', $book_ids, true);
     }
 
 }
@@ -357,13 +358,12 @@ function process_shiphawk_book_manual( $order ) {
 function SubscribeToTrackInfo($ship_hawk_book_id, $order) {
 
     $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
-
     $api_key = $plugin_settings['api_key'];
     $api_url = $plugin_settings['gateway_mode'];
 
     $subscribe_url = $api_url . 'shipments/' . $ship_hawk_book_id . '/tracking?api_key=' . $api_key;
 
-    //TODO subscribe url = http://www.woohawk.devigor.wdgtest.com/wp-content/plugins/woocommerce-shiphawk-shipping/interface.php?api_key=344
+    //TODO subscribe url ?
     $callback_url = 'http://www.woohawk.devigor.wdgtest.com/wp-content/plugins/woocommerce-shiphawk-shipping/interface.php';
 
     $items_array = array(
@@ -393,10 +393,46 @@ function SubscribeToTrackInfo($ship_hawk_book_id, $order) {
         }else{
             $order->add_order_note( __( 'Tracking id: ' . $arr_res->id . ', ' . $arr_res->resource_name . ',  created at: ' . $arr_res->created_at , 'woocommerce' ) );
         }
+    }
 
+    curl_close($curl);
+
+    //get and set shipment status
+    $status_response = getShipmentStatus($ship_hawk_book_id);
+
+    if($status_response->status) {
+        add_post_meta($order->id, 'current_status_of_shipment', $status_response->status);
+        $status_message = $ship_hawk_book_id . ' - ' . 'status has been changed to: ' . $status_response->status;
+        $order->add_order_note($status_message);
 
     }
-    curl_close($curl);
+
+}
+
+/*
+Retrieve the current status of a shipment, $shipment_id - book id
+*/
+function getShipmentStatus($shipment_id) {
+
+    $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
+    $api_key = $plugin_settings['api_key'];
+    $api_url = $plugin_settings['gateway_mode'];
+
+    $status_url = $api_url . 'shipments/' . $shipment_id . '/tracking?api_key=' . $api_key;
+
+    $curl = curl_init();
+
+    curl_setopt($curl, CURLOPT_URL, $status_url);
+    curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "GET");
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+
+    $resp = curl_exec($curl);
+    $arr_res = json_decode($resp);
+
+    return $arr_res;
+
+    //{"id":1016671,"status":"ordered","status_updates":[],"tracking_number":null}
+
 }
 
 /* get url to BOL pdf from shiphawk */
