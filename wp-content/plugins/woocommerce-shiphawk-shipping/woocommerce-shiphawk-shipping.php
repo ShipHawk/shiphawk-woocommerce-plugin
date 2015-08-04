@@ -1030,9 +1030,7 @@ function shiphawk_shiphawk_status_shipment_update(){
     //Use wp_next_scheduled to check if the event is already scheduled
     $timestamp = wp_next_scheduled( 'sh_status_update' );
 
-
     if( $timestamp == false ){
-
         wp_schedule_event( time(), 'twicedaily', 'sh_status_update' );
     }
 }
@@ -1046,6 +1044,7 @@ function update_shipments_status() {
     $shipping_orders = $wpdb->get_results( "SELECT id, post_title FROM {$wpdb->prefix}posts WHERE (post_type = 'shop_order')AND(post_status <> 'trash')" );
 
     wlog(date('l jS \of F Y h:i:s A'), 'timelog.log');
+    wlog(date('l jS \of F Y h:i:s A'), 'timelog2.log');
 
     foreach ($shipping_orders as $order) {
 
@@ -1059,7 +1058,7 @@ function update_shipments_status() {
                 $status_response = getShipmentStatus($book_id);
 
                 if($status_response->status) {
-                    
+
                     $current_shipment_status = get_post_meta( $order->id, 'current_status_of_shipment');
                     wlog($order->id, 'status.log');
                     wlog($current_shipment_status, 'status.log');

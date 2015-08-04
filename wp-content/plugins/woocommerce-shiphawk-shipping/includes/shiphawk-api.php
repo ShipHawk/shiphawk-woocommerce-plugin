@@ -128,8 +128,8 @@ function toBook($order_id, $rate_id, $order, $_items)
 }
 
 // Suggest product item type from ShipHawk
-add_action( 'wp_ajax_my_action', 'my_action_callback' );
-function my_action_callback() {
+add_action( 'wp_ajax_shiphawk_action', 'shiphawk_action_callback' );
+function shiphawk_action_callback() {
     $search_tag = $_POST['type_item'];
     $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
 

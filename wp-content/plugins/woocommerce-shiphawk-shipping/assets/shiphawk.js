@@ -20,7 +20,7 @@ return;
     function respondToClick(event) {
 
         var data = {
-            'action': 'my_action', // wp_ajax_my_action где my_action часть после wp_ajax_  !
+            'action': 'shiphawk_action', // wp_ajax_my_action
             'type_item': event.target.value      // We pass php values differently!
         };
 
@@ -51,7 +51,7 @@ function setItemid(el) {
     var post_id = jQuery(el).parent().parent().prev().attr("post_id");
     var type_item = el.innerHTML;
     var data = {
-        'action': 'set_item_type', // wp_ajax_my_action где my_action часть после wp_ajax_  !
+        'action': 'set_item_type', // wp_ajax_shiphawk_action
         'type_item': type_item,
         'type_item_value': el.id,
         'post_id': post_id
@@ -69,7 +69,7 @@ function getBolPdf(element){
     var bookid = element.id;
 
     var data = {
-        'action': 'get_bolpdf', // wp_ajax_my_action где my_action часть после wp_ajax_  !
+        'action': 'get_bolpdf', // wp_ajax_my_action
         'book_id': bookid
     };
 
