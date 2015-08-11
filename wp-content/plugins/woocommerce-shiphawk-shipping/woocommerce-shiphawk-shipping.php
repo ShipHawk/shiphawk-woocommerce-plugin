@@ -2,7 +2,7 @@
 /*
 Plugin Name: ShipHawk Shipping
 Description: ShipHawk Shipping for Woocommerce.
-Version: 1.3
+Version: 1.4.1
 Author: ShipHawk
 Author URI: https://shiphawk.com/
 */
@@ -265,8 +265,8 @@ class shiphawk_shipping extends WC_Shipping_Method {
                 'id' => $pa_shiphawk_item_type_value,
                 'product_id'=> $products['product_id'],
                 'xid'=> $products['product_id'],
-                'product_origin' => $this->getProductOrigin($products['product_id']),
-                'zip_code' => $this->getProductOriginZip($products['product_id'])
+                'product_origin' => getProductOrigin($products['product_id']),
+                'zip_code' => getProductOriginZip($products['product_id'])
             );
         }
 
@@ -289,7 +289,7 @@ class shiphawk_shipping extends WC_Shipping_Method {
             $from_zip = $_items[0]['zip_code'];
 
             /* get origin location type from first product */
-            $from_type  = $this->getProductOriginType($_items[0]['xid']);
+            $from_type  = getProductOriginType($_items[0]['xid']);
 
             if($is_multi_origin) $rate_filter = 'best';
 
@@ -355,20 +355,6 @@ class shiphawk_shipping extends WC_Shipping_Method {
 
     }
 
-    public function getProductOriginZip($product_id) {
-
-        if (checkProductOriginAttributes($product_id)) {
-            return get_post_meta( $product_id, 'origin_zipcode', true );
-        }
-
-        $shipping_origin = get_post_meta( $product_id, 'shipping_origin', true );
-        if(!empty($shipping_origin)) {
-            return get_post_meta( $shipping_origin, 'origin_zipcode', true );
-        }
-
-        return $this->origin_zipcode;
-    }
-
     public function getProductOriginType($product_id) {
 
         if (checkProductOriginAttributes($product_id)) {
@@ -381,21 +367,6 @@ class shiphawk_shipping extends WC_Shipping_Method {
         }
 
         return $this->origin_location_type;
-    }
-
-
-    public function getProductOrigin($product_id) {
-
-        if (checkProductOriginAttributes($product_id)) {
-            return 'per_product';
-        }
-
-        $shipping_origin = get_post_meta( $product_id, 'shipping_origin', true );
-        if(!empty($shipping_origin)) {
-            return get_post_meta( $shipping_origin, 'origin_zipcode', true );
-        }
-
-        return null;
     }
 
     public function admin_options() {
@@ -1074,4 +1045,46 @@ function update_shipments_status() {
             }
         }
     }
+}
+
+function getProductOrigin($product_id) {
+
+    if (checkProductOriginAttributes($product_id)) {
+        return 'per_product';
+    }
+
+    $shipping_origin = get_post_meta( $product_id, 'shipping_origin', true );
+    if(!empty($shipping_origin)) {
+        return $shipping_origin;
+    }
+
+    return null;
+}
+
+function getProductOriginZip($product_id) {
+
+    if (checkProductOriginAttributes($product_id)) {
+        return get_post_meta( $product_id, 'origin_zipcode', true );
+    }
+
+    $shipping_origin = get_post_meta( $product_id, 'shipping_origin', true );
+    if(!empty($shipping_origin)) {
+        return get_post_meta( $shipping_origin, 'origin_zipcode', true );
+    }
+
+    return $this->origin_zipcode;
+}
+
+function getProductOriginType($product_id) {
+
+    if (checkProductOriginAttributes($product_id)) {
+        return get_post_meta( $product_id, 'origin_location_type', true );
+    }
+
+    $shipping_origin = get_post_meta( $product_id, 'shipping_origin', true );
+    if(!empty($shipping_origin)) {
+        return get_post_meta( $shipping_origin, 'origin_location_type', true );
+    }
+
+    return $this->origin_location_type;
 }

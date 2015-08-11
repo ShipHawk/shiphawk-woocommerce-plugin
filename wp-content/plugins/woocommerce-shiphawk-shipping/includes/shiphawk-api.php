@@ -72,24 +72,24 @@ function toBook($order_id, $rate_id, $order, $_items)
             array(
                 'first_name' => $order->shipping_first_name,
                 'last_name' => $order->shipping_last_name,
-                'address_line_1' => $order->shipping_address_1,
-                'address_line_2' => $order->shipping_address_2,
-                'phone_num' => $order->billing_phone,
+                'street1' => $order->shipping_address_1,
+                'street2' => $order->shipping_address_2,
+                'phone_number' => $order->billing_phone,
                 'city' => $order->shipping_city,
                 'state' => $order->shipping_state,
-                'zipcode' => $order->shipping_postcode,
+                'zip' => $order->shipping_postcode,
                 'email' => $order->billing_email
             ),
         'billing_address' =>
             array(
                 'first_name' => $order->billing_first_name,
                 'last_name' => $order->billing_last_name,
-                'address_line_1' => $order->billing_address_1,
-                'address_line_2' => $order->billing_address_2,
-                'phone_num' => $order->billing_phone,
+                'street1' => $order->billing_address_1,
+                'street2' => $order->billing_address_2,
+                'phone_number' => $order->billing_phone,
                 'city' => $order->billing_city,
                 'state' => $order->billing_state,
-                'zipcode' => $order->billing_postcode,
+                'zip' => $order->billing_postcode,
                 'email' => $order->billing_email
             ),
         'pickup' =>
@@ -252,7 +252,11 @@ function process_shiphawk_book_manual( $order ) {
         $pa_shiphawk_item_type_value = get_post_meta( $products['product_id'], 'shiphawk_product_item_type_value', true );
         $woocommerce_dimension_unit = get_option('woocommerce_dimension_unit');
         $woocommerce_weight_unit = get_option('woocommerce_weight_unit');
+
+
         $product_origin = get_post_meta( $products['product_id'], 'shipping_origin', true );
+
+
         $product_length = round(convertToInchLbs(get_post_meta( $products['product_id'], '_length', true), $woocommerce_dimension_unit), 2);
         $product_width = round(convertToInchLbs(get_post_meta( $products['product_id'], '_width', true), $woocommerce_weight_unit), 2);
         $product_height = round(convertToInchLbs(get_post_meta( $products['product_id'], '_height', true), $woocommerce_dimension_unit), 2);
@@ -270,7 +274,7 @@ function process_shiphawk_book_manual( $order ) {
             'id' => $pa_shiphawk_item_type_value,
             'product_id'=> $products['product_id'],
             'xid'=> $products['product_id'],
-            'product_origin' => $product_origin
+            'product_origin' => getProductOrigin($products['product_id']),
         );
     }
 
@@ -287,11 +291,11 @@ function process_shiphawk_book_manual( $order ) {
 
     foreach ($grouped_items_by_origin as $origin_id=>$_items) {
         // PER PRODUCT
-        $from_zip = (get_post_meta( $origin_id, 'origin_zipcode', true )) ? get_post_meta( $origin_id, 'origin_zipcode', true ) : $plugin_settings['origin_zipcode'];
-
+        //$from_zip = (get_post_meta( $origin_id, 'origin_zipcode', true )) ? get_post_meta( $origin_id, 'origin_zipcode', true ) : $plugin_settings['origin_zipcode'];
+        $from_zip = getProductOriginZip($_items[0]['xid']);
         // PER PRODUCT
         $from_type = (get_post_meta( $origin_id, 'origin_location_type', true )) ? get_post_meta( $origin_id, 'origin_location_type', true ) : $plugin_settings['origin_location_type'];
-
+        $from_type = getProductOriginType($_items[0]['xid']);
         if ($is_multiorigin) $rate_filter = 'best';
 
 
@@ -304,13 +308,12 @@ function process_shiphawk_book_manual( $order ) {
                 //if (round(getPrice($shipping_rate),3) == round($shipping_amount,3)) {
                 // check price
                 $shipping_price_from_rate = (string) round(getPrice($shipping_rate),2);
-                wlog($shipping_price_from_rate, 'ssssss5');
+
 
                 if (getOriginalShipHawkShippingPrice($shipping_code, $shipping_price_from_rate)) {
                     update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
 
                     $book_id = toBook($order_id, $shipping_rate->id, $order, $_items);
-                    wlog($book_id, 'ssssss3');
 
                     if($book_id->details->id) {
                         //update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);

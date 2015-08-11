@@ -44,13 +44,13 @@ function getDefaultOriginAddress () {
 
     $origin_address['first_name']          = $plugin_settings['origin_first_name'];
     $origin_address['last_name']           = $plugin_settings['origin_last_name'];
-    $origin_address['address_line_1']         = $plugin_settings['origin_address'];
-    $origin_address['address_line_2']         = $plugin_settings['origin_address_2'];
+    $origin_address['street1']         = $plugin_settings['origin_address'];
+    $origin_address['street2']         = $plugin_settings['origin_address_2'];
     $origin_address['state']           = $plugin_settings['origin_state'];
     $origin_address['city']        = $plugin_settings['origin_city'];
-    $origin_address['zipcode']         = $plugin_settings['origin_zipcode'];
+    $origin_address['zip']         = $plugin_settings['origin_zipcode'];
     $origin_address['origin_location_type']           = $plugin_settings['origin_location_type'];
-    $origin_address['phone_num']           = $plugin_settings['origin_phone'];
+    $origin_address['phone_number']           = $plugin_settings['origin_phone'];
     $origin_address['email']           = $plugin_settings['origin_email'];
 
     return $origin_address;
@@ -65,13 +65,13 @@ function getOriginAddress ($origin_id, $product_id) {
     if (checkProductOriginAttributes($product_id)) {
         $origin_address['first_name']          = get_post_meta( $product_id, 'origin_first_name', true);
         $origin_address['last_name']           = get_post_meta( $product_id, 'origin_last_name', true);
-        $origin_address['address_line_1']         = get_post_meta( $product_id, 'origin_address', true);
-        $origin_address['address_line_2']         = (get_post_meta( $product_id, 'origin_address2', true)) ? get_post_meta( $product_id, 'origin_address2', true) : '';
+        $origin_address['street1']         = get_post_meta( $product_id, 'origin_address', true);
+        $origin_address['street2']         = (get_post_meta( $product_id, 'origin_address2', true)) ? get_post_meta( $product_id, 'origin_address2', true) : '';
         $origin_address['state']           = get_post_meta( $product_id, 'origin_state', true);
         $origin_address['city']        = get_post_meta( $product_id, 'origin_city', true);
-        $origin_address['zipcode']         = get_post_meta( $product_id, 'origin_zipcode', true);
+        $origin_address['zip']         = get_post_meta( $product_id, 'origin_zipcode', true);
         $origin_address['origin_location_type']           = get_post_meta( $product_id, 'origin_location_type', true);
-        $origin_address['phone_num']           = get_post_meta( $product_id, 'origin_phone', true);
+        $origin_address['phone_number']           = get_post_meta( $product_id, 'origin_phone', true);
         $origin_address['email']           = get_post_meta( $product_id, 'origin_email', true);
 
         return $origin_address;
@@ -82,13 +82,13 @@ function getOriginAddress ($origin_id, $product_id) {
 
         $origin_address['first_name']          = get_post_meta( $origin_id, 'origin_first_name', true);
         $origin_address['last_name']           = get_post_meta( $origin_id, 'origin_last_name', true);
-        $origin_address['address_line_1']         = get_post_meta( $origin_id, 'origin_address', true);
-        $origin_address['address_line_2']         = (get_post_meta( $origin_id, 'origin_address2', true)) ? get_post_meta( $origin_id, 'origin_address2', true) : '';
+        $origin_address['street1']         = get_post_meta( $origin_id, 'origin_address', true);
+        $origin_address['street2']         = (get_post_meta( $origin_id, 'origin_address2', true)) ? get_post_meta( $origin_id, 'origin_address2', true) : '';
         $origin_address['state']           = get_post_meta( $origin_id, 'origin_state', true);
         $origin_address['city']        = get_post_meta( $origin_id, 'origin_city', true);
-        $origin_address['zipcode']         = get_post_meta( $origin_id, 'origin_zipcode', true);
+        $origin_address['zip']         = get_post_meta( $origin_id, 'origin_zipcode', true);
         $origin_address['origin_location_type']           = get_post_meta( $origin_id, 'origin_location_type', true);
-        $origin_address['phone_num']           = get_post_meta( $origin_id, 'origin_phone', true);
+        $origin_address['phone_number']           = get_post_meta( $origin_id, 'origin_phone', true);
         $origin_address['email']           = get_post_meta( $origin_id, 'origin_email', true);
 
         return $origin_address;
