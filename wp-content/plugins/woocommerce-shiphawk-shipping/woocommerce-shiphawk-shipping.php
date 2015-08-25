@@ -2,7 +2,7 @@
 /*
 Plugin Name: ShipHawk Shipping
 Description: ShipHawk Shipping for Woocommerce.
-Version: 1.4.1
+Version: 1.4.2
 Author: ShipHawk
 Author URI: https://shiphawk.com/
 */
@@ -355,20 +355,6 @@ class shiphawk_shipping extends WC_Shipping_Method {
 
     }
 
-    public function getProductOriginType($product_id) {
-
-        if (checkProductOriginAttributes($product_id)) {
-            return get_post_meta( $product_id, 'origin_location_type', true );
-        }
-
-        $shipping_origin = get_post_meta( $product_id, 'shipping_origin', true );
-        if(!empty($shipping_origin)) {
-            return get_post_meta( $shipping_origin, 'origin_location_type', true );
-        }
-
-        return $this->origin_location_type;
-    }
-
     public function admin_options() {
         //work only in admin page
         $shiphawk_plugin_version = '';
@@ -620,19 +606,19 @@ function my_enqueue($hook) {
 }
 
 // Add notice in admin (updated error)
-function my_admin_notice(){
+function shiphawk_id_notice(){
     global $pagenow, $post;
 
     if (( $pagenow == 'post.php' ) && (get_post_type( $post ) == 'shop_order')) {
         $ship_hawk_book_id = get_post_meta( $post->ID, 'ship_hawk_book_id', true );
-        if (!count($ship_hawk_book_id)>0) {
+        if (empty($ship_hawk_book_id)) {
         echo '<div class="error">
              <p>Order does not have ShipHawk book Id.</p>
          </div>';
         }
     }
 }
-add_action('admin_notices', 'my_admin_notice');
+add_action('admin_notices', 'shiphawk_id_notice');
 
 /**
  * Update the order meta with field value
@@ -734,7 +720,7 @@ function ShipHawk_custom_checkout_field_update_order_meta( $order_id ) {
 
             }
 
-            if(count($book_ids)>0) {
+            if(!empty($book_ids)) {
                 add_post_meta( $order_id, 'ship_hawk_book_id', $book_ids, true);
             }
     }
@@ -769,9 +755,7 @@ function get_BOL_PDF_action($order){
 
     $ship_hawk_book_ids = get_post_meta( $order_id, 'ship_hawk_book_id', true );
 
-    //1016194 test book id with
-    //$ship_hawk_book_id = 1016194;
-    if(count($ship_hawk_book_ids)>0) {
+    if((!empty($ship_hawk_book_ids))) {
         foreach($ship_hawk_book_ids as $ship_hawk_book_id) {
             echo '<a onclick="getBolPdf(this)" class="bol_link" id="' . $ship_hawk_book_id .'">Get BOL PDF for ' . $ship_hawk_book_id .' shipment</a></br>';
         }
@@ -1010,19 +994,14 @@ function shiphawk_shiphawk_status_shipment_update(){
 add_action( 'sh_status_update', 'update_shipments_status' );
 function update_shipments_status() {
     global $wpdb;
-    //1016671
 
     $shipping_orders = $wpdb->get_results( "SELECT id, post_title FROM {$wpdb->prefix}posts WHERE (post_type = 'shop_order')AND(post_status <> 'trash')" );
-
-    wlog(date('l jS \of F Y h:i:s A'), 'timelog.log');
-    wlog(date('l jS \of F Y h:i:s A'), 'timelog2.log');
 
     foreach ($shipping_orders as $order) {
 
         $ship_hawk_book_ids = get_post_meta( $order->id, 'ship_hawk_book_id', true );
-        wlog($ship_hawk_book_ids);
 
-        if (count($ship_hawk_book_ids) > 0) {
+        if (!empty($ship_hawk_book_ids)) {
 
             foreach ($ship_hawk_book_ids as $book_id) {
 
@@ -1031,8 +1010,6 @@ function update_shipments_status() {
                 if($status_response->status) {
 
                     $current_shipment_status = get_post_meta( $order->id, 'current_status_of_shipment');
-                    wlog($order->id, 'status.log');
-                    wlog($current_shipment_status, 'status.log');
 
                     if($current_shipment_status<>$status_response->status) {
                         update_post_meta($order->id, 'current_status_of_shipment', $status_response->status);
@@ -1063,6 +1040,7 @@ function getProductOrigin($product_id) {
 
 function getProductOriginZip($product_id) {
 
+
     if (checkProductOriginAttributes($product_id)) {
         return get_post_meta( $product_id, 'origin_zipcode', true );
     }
@@ -1072,7 +1050,9 @@ function getProductOriginZip($product_id) {
         return get_post_meta( $shipping_origin, 'origin_zipcode', true );
     }
 
-    return $this->origin_zipcode;
+    $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
+
+    return $plugin_settings['origin_zipcode'];
 }
 
 function getProductOriginType($product_id) {
@@ -1086,5 +1066,7 @@ function getProductOriginType($product_id) {
         return get_post_meta( $shipping_origin, 'origin_location_type', true );
     }
 
-    return $this->origin_location_type;
+    $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
+
+    return $plugin_settings['origin_location_type'];
 }
