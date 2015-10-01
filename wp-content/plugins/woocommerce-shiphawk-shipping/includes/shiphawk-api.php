@@ -151,9 +151,11 @@ function shiphawk_action_callback() {
     $responce_array = array();
     $responce = array();
 
-    if(($arr_res->error) || ($arr_res['error'])) {
-        $responce_html = '';
-        $responce['shiphawk_error'] = $arr_res->error;
+    if(is_object($arr_res)){
+        if(property_exists($arr_res, 'error')) {
+            $responce_html = '';
+            $responce['shiphawk_error'] = $arr_res->error;
+        }
     }else{
         foreach ((array) $arr_res as $el) {
             $responce_array[$el->id] = $el->name.' ('.$el->category_name.')';
@@ -203,7 +205,7 @@ function get_bolpdf_callback() {
 
     $responce_BOL = getBOLpdf($book_id);
 
-    if ($responce_BOL->url) {
+    if (property_exists($responce_BOL, 'url')) {
         //$io = new Varien_Io_File();
         //$path_to_save_bol_pdf = Mage::getBaseDir('media'). DS .'shiphawk'. DS .'bol';
         $path_to_save_bol_pdf = $upload_dir['path'];
@@ -218,7 +220,9 @@ function get_bolpdf_callback() {
         }
 
     }else{
-        $responce['shiphawk_error'] = $responce_BOL->error;
+        if(property_exists($responce_BOL, 'error')) {
+            $responce['shiphawk_error'] = $responce_BOL->error;
+        }
     }
 
     //$responce['shiphawk_error'] = 'error';
@@ -228,6 +232,72 @@ function get_bolpdf_callback() {
     wp_die();
 }
 
+// get ShipHawk Shipment status updates
+add_action( 'wp_ajax_get_shiphawk_status', 'get_shiphawk_status_callback' );
+function get_shiphawk_status_callback() {
+
+    $book_id = $_POST['book_id'];
+
+    $responce = array();
+
+    $responce['shiphawk_status']= '';
+    $responce['shiphawk_error'] = '';
+
+    //get and set shipment status
+    $status_response = getShipmentStatus($book_id);
+
+    if(property_exists($status_response, 'status')) {
+        $comment = _getTextForStatus($status_response->status);
+        $responce['shiphawk_status']= $comment;
+    }else{
+        if(property_exists($status_response, 'error')) {
+            $responce['shiphawk_error'] = $status_response->error;
+        }
+    }
+
+    echo json_encode($responce);
+
+    wp_die();
+}
+
+function _getTextForStatus($status) {
+
+    $crated_date = '';
+    $crated_time = '';
+    switch ($status) {
+        case 'in_transit':
+            //$comment = "Shipment status changed to In Transit (" . $crated_date . " at " . $crated_time . "). Your shipment is with the carrier and is in transit.";
+            $comment = "Shipment status changed to In Transit. Your shipment is with the carrier and is in transit.";
+            break;
+        case 'confirmed':
+            //$comment = "Shipment status changed to Confirmed (" . $crated_date . " at " . $crated_time . "). Your shipment has been successfully confirmed.";
+            $comment = "Shipment status changed to Confirmed. Your shipment has been successfully confirmed.";
+            break;
+        case 'scheduled_for_pickup':
+            //$comment = "Shipment status changed to Scheduled (" . $crated_date . " at " . $crated_time . "). Your shipment has been scheduled for pickup.";
+            $comment = "Shipment status changed to Scheduled. Your shipment has been scheduled for pickup.";
+            break;
+        case 'agent_prep':
+            //$comment = "Shipment status changed to Agent Prep (" . $crated_date . " at " . $crated_time . "). Your shipment is now being professionally prepared for carrier pickup.";
+            $comment = "Shipment status changed to Agent Prep. Your shipment is now being professionally prepared for carrier pickup.";
+            break;
+        case 'delivered':
+            //$comment = "Shipment status changed to Delivered (" . $crated_date . " at " . $crated_time . "). Your shipment has been delivered!";
+            $comment = "Shipment status changed to Delivered . Your shipment has been delivered!";
+            break;
+        case 'cancelled':
+            //$comment = "Shipment status changed to Cancelled (" . $crated_date . " at " . $crated_time . "). Your shipment has been cancelled successfully.";
+            $comment = "Shipment status changed to Cancelled. Your shipment has been cancelled successfully.";
+            break;
+        default:
+            $comment = "Status was updated to " . $status ;
+
+    }
+
+    return $comment;
+}
+
+
 add_action( 'woocommerce_order_action_shiphawk_book_manual', 'process_shiphawk_book_manual' );
 
 /* Manual Book */
@@ -236,51 +306,19 @@ function process_shiphawk_book_manual( $order ) {
     $order_id = $order->id;
 
     //check if Book Id exist
-    $ship_hawk_book_id = get_post_meta( $order->id, 'ship_hawk_book_id', true );
+    $ship_hawk_book_id = get_post_meta( $order->id, 'ship_hawk_book_id');
 
-    if (!empty($ship_hawk_book_id)) {
-        return;
+    //get shiphawk rate ids
+
+    $ship_hawk_order_id_arrays = get_post_meta( $order->id, '_shiphawk_shipping_id', true );
+
+    if ((!empty($ship_hawk_book_id))||(empty($ship_hawk_order_id_arrays))) {
+       return;
     }
+
+    $is_multiorigin = get_post_meta( $order->id, '_is_multi_origin', true );
 
     $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
-    $shipping_method = $order->get_shipping_method();
-    $shipping_amount = $order->get_total_shipping();
-
-    $items = array();
-    foreach ($order->get_items() as $products) {
-
-        $pa_shiphawk_item_type_value = get_post_meta( $products['product_id'], 'shiphawk_product_item_type_value', true );
-        $woocommerce_dimension_unit = get_option('woocommerce_dimension_unit');
-        $woocommerce_weight_unit = get_option('woocommerce_weight_unit');
-
-
-        $product_origin = get_post_meta( $products['product_id'], 'shipping_origin', true );
-
-
-        $product_length = round(convertToInchLbs(get_post_meta( $products['product_id'], '_length', true), $woocommerce_dimension_unit), 2);
-        $product_width = round(convertToInchLbs(get_post_meta( $products['product_id'], '_width', true), $woocommerce_weight_unit), 2);
-        $product_height = round(convertToInchLbs(get_post_meta( $products['product_id'], '_height', true), $woocommerce_dimension_unit), 2);
-        $product_weight = round(convertToInchLbs(get_post_meta( $products['product_id'], '_weight', true), $woocommerce_weight_unit), 2);
-
-        $product_price = (get_post_meta( $products['product_id'], '_sale_price', true)) ? (get_post_meta( $products['product_id'], '_sale_price', true)) : get_post_meta( $products['product_id'], '_regular_price', true);
-        $items[] = array(
-            'width' => $product_width,
-            'length' => $product_length,
-            'height' => $product_height,
-            'weight' => $product_weight,
-            'value' => getShipHawkItemValue($products['product_id'],$product_price),
-            'quantity' => $products['qty'],
-            'packed' => getIsPacked($products['product_id']),
-            'id' => $pa_shiphawk_item_type_value,
-            'product_id'=> $products['product_id'],
-            'xid'=> $products['product_id'],
-            'product_origin' => getProductOrigin($products['product_id']),
-        );
-    }
-
-    $grouped_items_by_origin = getGroupedItemsByOrigin($items);
-
-    $is_multiorigin = (count($grouped_items_by_origin) > 1) ? true : false;
 
     $to_zip = $order->shipping_postcode;
 
@@ -289,68 +327,97 @@ function process_shiphawk_book_manual( $order ) {
 
     $shipping_code = (string) get_post_meta( $order_id, '_shipping_code_original_amount', true );
 
-    foreach ($grouped_items_by_origin as $origin_id=>$_items) {
-        // PER PRODUCT
-        //$from_zip = (get_post_meta( $origin_id, 'origin_zipcode', true )) ? get_post_meta( $origin_id, 'origin_zipcode', true ) : $plugin_settings['origin_zipcode'];
-        $from_zip = getProductOriginZip($_items[0]['xid']);
-        // PER PRODUCT
-        $from_type = (get_post_meta( $origin_id, 'origin_location_type', true )) ? get_post_meta( $origin_id, 'origin_location_type', true ) : $plugin_settings['origin_location_type'];
-        $from_type = getProductOriginType($_items[0]['xid']);
-        if ($is_multiorigin) $rate_filter = 'best';
+    if($is_multiorigin) {
+        $rate_filter = 'best';
+    }
 
+        foreach ($ship_hawk_order_id_arrays as $shipping_rate_items_info) {
 
-        $ship_rates = getShiphawkRate($from_zip, $to_zip, $_items, $rate_filter, $from_type);
-        //if ($shipping_rate->summary->service == $shipping_method) {
+            //get origin zip code from first product item,
+            $from_zip = $shipping_rate_items_info['items'][0]['zip_code'];
+            $items = $shipping_rate_items_info['items'];
+            // get origin location type from first product
+            //todo if items have various location type
+            $from_type  = getProductOriginType($shipping_rate_items_info['items'][0]['xid']);
 
-        foreach ($ship_rates as $shipping_rate) {
-            if (!$is_multiorigin) {
+            // if multi origin shipment - then rate filter = best and we have only one shipping method
+            if ($is_multiorigin) {
 
-                //if (round(getPrice($shipping_rate),3) == round($shipping_amount,3)) {
-                // check price
-                $shipping_price_from_rate = (string) round(getPrice($shipping_rate),2);
+                $ship_rates = getShiphawkRate($from_zip, $to_zip, $items, $rate_filter, $from_type);
 
-
-                if (getOriginalShipHawkShippingPrice($shipping_code, $shipping_price_from_rate)) {
-                    update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
-
-                    $book_id = toBook($order_id, $shipping_rate->id, $order, $_items);
-
-                    if($book_id->details->id) {
-                        //update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
-                        $order->add_order_note( __( 'Book Id: ' . $book_id->details->id, 'woocommerce' ) );
-                        $book_ids[] = $book_id->details->id;
-                    }
-
-                    if ($book_id->details->id) {
-                        SubscribeToTrackInfo($book_id->details->id, $order);
-                    }else{
-                        $order->add_order_note( __( 'No ShipHawk id ', 'woocommerce' ) );
-                    }
-
-                }
-            }else {
-                update_post_meta( $order_id, 'ship_hawk_order_id', $shipping_rate->id);
-
-                $book_id = toBook($order_id, $shipping_rate->id, $order, $_items);
-
-                if($book_id->details->id) {
-                    //update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
-                    $order->add_order_note( __( 'Book Id: ' . $book_id->details->id, 'woocommerce' ) );
-                    $book_ids[] = $book_id->details->id;
+                //ShipHawk API error
+                if(is_object($ship_rates)){
+                    if(property_exists($ship_rates, 'error')) return;
                 }
 
-                if ($book_id->details->id) {
-                    SubscribeToTrackInfo($book_id->details->id, $order);
-                }else{
-                    $order->add_order_note( __( 'No ShipHawk id ', 'woocommerce' ) );
-                    if($book_id->error) {
+                if(property_exists($ship_rates[0], 'id')) {
+                    $shipping_rate_id = $ship_rates[0]->id;
+                    $book_id = toBook($order_id, $shipping_rate_id, $order, $items);
+
+                    if(property_exists($book_id, 'error')) {
                         $order->add_order_note( __( $book_id->error, 'woocommerce' ) );
-                    }
+                        $order->add_order_note( __( 'No ShipHawk Book id ', 'woocommerce' ) );
 
+                    }else{
+                        if($book_id->details->id) {
+                            //update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
+                            $order->add_order_note( __( 'Book Id: ' . $book_id->details->id, 'woocommerce' ) );
+                            SubscribeToTrackInfo($book_id->details->id, $order);
+                            $book_ids[] = $book_id->details->id;
+                        }else{
+                            $order->add_order_note( __( 'No ShipHawk Book id ', 'woocommerce' ) );
+                        }
+                    }
+                }else{
+                    //TODO check errors
+                    $order->add_order_note( __( 'No ShipHawk Rate Id ', 'woocommerce' ) );
+                }
+
+            }else{
+                // single origin shipment
+
+                $ship_rates = getShiphawkRate($from_zip, $to_zip, $items, $rate_filter, $from_type);
+
+                //ShipHawk API error
+                if(is_object($ship_rates)){
+                    if(property_exists($ship_rates, 'error')) return;
+                }
+
+                foreach ($ship_rates as $shipping_rate) {
+
+                    // check price
+                    $shipping_price_from_rate = (string) round(getPrice($shipping_rate),2);
+
+                    //if original shipping price from order = shipping price from shipping rate
+                    if (getOriginalShipHawkShippingPrice($shipping_code, $shipping_price_from_rate)) {
+
+                        if(property_exists($shipping_rate, 'id')) {
+                            $shipping_rate_id = $shipping_rate->id;
+                            $book_id = toBook($order_id, $shipping_rate_id, $order, $items);
+
+                            if(property_exists($book_id, 'error')) {
+                                $order->add_order_note( __( $book_id->error, 'woocommerce' ) );
+                                $order->add_order_note( __( 'No ShipHawk Book id ', 'woocommerce' ) );
+
+                            }else{
+                                if($book_id->details->id) {
+                                    //update_post_meta( $order_id, 'ship_hawk_book_id', $book_id->details->id);
+                                    $order->add_order_note( __( 'Book Id: ' . $book_id->details->id, 'woocommerce' ) );
+                                    SubscribeToTrackInfo($book_id->details->id, $order);
+                                    $book_ids[] = $book_id->details->id;
+                                }else{
+                                    $order->add_order_note( __( 'No ShipHawk Book id ', 'woocommerce' ) );
+                                }
+                            }
+                        }else{
+                            //TODO check errors
+                            $order->add_order_note( __( 'No ShipHawk Rate Id ', 'woocommerce' ) );
+                        }
+                    }
                 }
             }
         }
-    }
+
 
     if(count($book_ids)>0) {
         add_post_meta( $order_id, 'ship_hawk_book_id', $book_ids, true);
@@ -391,7 +458,7 @@ function SubscribeToTrackInfo($ship_hawk_book_id, $order) {
 
     if (!empty($arr_res) && (is_object($arr_res))) {
         // add order note
-        if ($arr_res->error) {
+        if (property_exists($arr_res, 'error')) {
             $order->add_order_note( __( 'Tracking error : ' . $arr_res->error, 'woocommerce' ) );
         }else{
             $order->add_order_note( __( 'Tracking id: ' . $arr_res->id . ', ' . $arr_res->resource_name . ',  created at: ' . $arr_res->created_at , 'woocommerce' ) );
@@ -403,7 +470,7 @@ function SubscribeToTrackInfo($ship_hawk_book_id, $order) {
     //get and set shipment status
     $status_response = getShipmentStatus($ship_hawk_book_id);
 
-    if($status_response->status) {
+    if(property_exists($status_response, 'status')) {
         add_post_meta($order->id, 'current_status_of_shipment', $status_response->status);
         $status_message = $ship_hawk_book_id . ' - ' . 'status has been changed to: ' . $status_response->status;
         $order->add_order_note($status_message);
@@ -431,6 +498,8 @@ function getShipmentStatus($shipment_id) {
 
     $resp = curl_exec($curl);
     $arr_res = json_decode($resp);
+
+    shiphawk_log($arr_res, 'Tracking status ');
 
     return $arr_res;
 

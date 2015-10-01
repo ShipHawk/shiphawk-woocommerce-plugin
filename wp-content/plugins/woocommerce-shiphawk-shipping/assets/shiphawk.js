@@ -32,10 +32,9 @@ return;
 
             var obj_responce = jQuery.parseJSON(response);
 
-            //shiphawk_type_value.text(obj_responce.responce_html);
             shiphawk_type_value.html(obj_responce.responce_html);
             shiphawk_type_value.show();
-            //jQuery(shiphawk_type_of_product).show();
+
         });
     }
 }
@@ -84,7 +83,6 @@ function getBolPdf(element){
         }else{
             if(obj_responce.bol_url) {
 
-                // alert(responce_html.bol_url);
                 //window.location = responce_html.bol_url;
 
                 window.open(
@@ -96,5 +94,4 @@ function getBolPdf(element){
         }
 
     });
-
 }

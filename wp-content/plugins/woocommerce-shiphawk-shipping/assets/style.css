@@ -7,7 +7,11 @@
 
 }
 
-.bol_link {
+.bol_link, .track_link{
     cursor: pointer;
+    text-decoration: none;
+}
+
+.bol_link:hover, .track_link:hover {
     text-decoration: underline;
 }

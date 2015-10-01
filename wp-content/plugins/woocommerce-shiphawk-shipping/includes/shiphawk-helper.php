@@ -162,6 +162,7 @@ function checkProductOriginAttributes( $product_id ) {
 }
 
 function getPrice($object) {
+    // todo final_mile->price ?
     return $object->shipping->price + $object->packing->price + $object->pickup->price + $object->delivery->price + $object->insurance->price;
 }
 
@@ -208,13 +209,31 @@ function getOriginalShipHawkShippingPrice($shipping_code, $shipping_method_price
 /*
  * log function
  *  */
-function wlog($var, $file_name = 'wlog.php') {
+function wlog($var, $file_name = 'shiphawk-log.php') {
+
     $var_str = var_export($var, true);
-    $var = "<?php\n\n\$ = $var_str;\n\n?>";
+    $var = "$var_str;\n\n";
     $file = plugin_dir_path( __FILE__ ) . '/log/' . $file_name;
-    //file_put_contents($file, $var);
+    file_put_contents($file, $var);
     $f = fopen($file, 'a+');
     fwrite($f, $var);
-    fclose($f);
     chmod($file, 0777);
+    fclose($f);
+
+}
+
+if(!function_exists('shiphawk_log')){
+    function shiphawk_log( $message, $text = '' ) {
+        if( WP_DEBUG === true ){
+            if( is_array( $message ) || is_object( $message ) ){
+                error_log( print_r( '-------' . $text . '-------', true ) );
+                error_log( print_r( $message, true ) );
+                error_log( print_r( '-------' . $text . '-------', true ) );
+            } else {
+                error_log( print_r( '-------' . $text . '-------', true ) );
+                error_log( $message );
+                error_log( print_r( '-------' . $text . '-------', true ) );
+            }
+        }
+    }
 }
