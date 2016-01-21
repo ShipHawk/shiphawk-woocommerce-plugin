@@ -881,7 +881,7 @@ function get_ShipmentStatusUrl($order){
 
         }
     </script>
-    <?
+    <?php
 
 }
 
