@@ -181,7 +181,7 @@ function getCustomerAddress($order)
         'street2' =>        $order->get_billing_address_2(),
         'phone_number' =>   $order->get_billing_phone(),
         'city' =>           $order->get_billing_city(),
-        'state' =>          $state_name,
+        'state' =>          $order->get_billing_state(),
         'country' =>        $country_name,
         'zip' =>            $order->get_billing_postcode(),
         'email' =>          $order->get_billing_email(),
@@ -207,7 +207,7 @@ function getStoreAddress()
         'street1' =>        get_option('woocommerce_store_address', ''),
         'street2' =>        get_option('woocommerce_store_address_2', ''),
         'city' =>           get_option('woocommerce_store_city', ''),
-        'state' =>          _getStateFromCode($country_code, $state_code),
+        'state' =>          $state_code,
         'country' =>        _getCountryFromCode($country_code),
         'zip' =>            get_option('woocommerce_store_postcode', ''),
     );
