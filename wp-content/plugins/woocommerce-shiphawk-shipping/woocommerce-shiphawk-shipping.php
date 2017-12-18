@@ -24,15 +24,23 @@ function init_shiphawk_shipping()
     class shiphawk_shipping extends WC_Shipping_Method
     {
 
-        function __construct()
+        function __construct($instance_id = 0)
         {
 
-            $this->id = 'shiphawk_shipping';
-            $this->method_title = __('ShipHawk Shipping', 'woocommerce');
-            $this->admin_page_heading = __('ShipHawk Shipping', 'woocommerce');
-            $this->admin_page_description = __('ShipHawk Shipping', 'woocommerce');
+            $this->id                       = 'shiphawk_shipping';
+            $this->instance_id 			    = absint( $instance_id );
+            $this->method_title             = __('ShipHawk Shipping', 'woocommerce');
+            $this->admin_page_heading       = __('ShipHawk Shipping', 'woocommerce');
+            $this->admin_page_description   = __('ShipHawk Shipping', 'woocommerce');
+            $this->method_description       = __('ShipHawk Shipping', 'woocommerce');
+            $this->supports              = array(
+                'shipping-zones',
+                'instance-settings',
+                'instance-settings-modal',
+                /*'settings',*/
+            );
 
-            add_action('woocommerce_update_options_shipping_' . $this->id, array(&$this, 'process_admin_options'));
+            add_action('woocommerce_update_options_shipping_' . $this->id, array($this, 'process_admin_options'));
 
             $this->init();
         }
@@ -42,24 +50,23 @@ function init_shiphawk_shipping()
          */
         function init()
         {
-
             $this->init_form_fields();
             $this->init_settings();
 
-            $this->enabled = $this->settings['enabled'];
+            $this->enabled          = $this->settings['enabled'];
+            $this->api_key          = $this->settings['api_key'];
+            $this->gateway_mode     = $this->settings['gateway_mode'];
+            $this->title            = 'ShipHawk Shipping';
 
-            $this->api_key = $this->settings['api_key'];
-            $this->gateway_mode = $this->settings['gateway_mode'];
-
-            $this->manual_shipping = $this->settings['manual_import_order'];
+            $this->manual_shipping  = $this->settings['manual_import_order'];
             //$this->origin_postcode = $this->settings['origin_postcode'];
-
         }
 
         function init_form_fields()
         {
 
-            $this->form_fields = array(
+            //$this->form_fields = array(
+            $this->instance_form_fields = array(
                 'enabled' => array(
                     'title' => __('Enable/Disable', 'woocommerce'),
                     'type' => 'checkbox',
@@ -293,7 +300,8 @@ add_action('woocommerce_order_status_cancelled', 'order_status_cancelled', 10, 1
  **/
 function add_shiphawk_shipping($methods)
 {
-    $methods[] = 'shiphawk_shipping';
+    $methods['shiphawk_shipping'] = 'shiphawk_shipping';
+
     return $methods;
 }
 
@@ -373,3 +381,11 @@ function shiphook_shipping_deactivation()
 {
     wp_clear_scheduled_hook('shiphawk_import_orders');
 }
+
+/*function request_shipping_quote_shipping_method( $methods ) {
+    $methods['request_a_shipping_quote'] = 'shiphawk_shipping';
+
+    return $methods;
+}
+
+add_filter( 'woocommerce_shipping_methods', 'request_shipping_quote_shipping_method' );*/

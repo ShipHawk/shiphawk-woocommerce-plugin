@@ -14,7 +14,9 @@ function getShiphawkRate($rateRequest)
 
     $url_api_rates = $api_url . 'rates?api_key=' . $api_key;
     $curl = curl_init();
+    log_me('Rate Request:');
     log_me($rateRequest);
+    log_me($url_api_rates);
 
     $items_array = json_encode($rateRequest);
 
@@ -30,6 +32,8 @@ function getShiphawkRate($rateRequest)
 
     $resp = curl_exec($curl);
     $arr_res = json_decode($resp);
+    log_me('Rate Response:');
+    log_me($arr_res);
     curl_close($curl);
     return $arr_res;
 }
@@ -46,6 +50,9 @@ function pushOrder($orderRequest)
     $curl = curl_init();
 
     $jsonOrderRequest = json_encode($orderRequest);
+    log_me('Order Request:');
+    log_me($jsonOrderRequest);
+    log_me($url_api_rates);
 
     curl_setopt($curl, CURLOPT_URL, $url_api_rates);
     curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "POST");
@@ -59,6 +66,8 @@ function pushOrder($orderRequest)
 
     $resp = curl_exec($curl);
     $arr_res = json_decode($resp);
+    log_me('Order Response:');
+    log_me($url_api_rates);
     curl_close($curl);
     return $arr_res;
 }
@@ -165,6 +174,8 @@ function process_shiphawk_order_import($order)
         }else{
             $order->add_order_note('Order successfully imported to ShipHawk');
         }
+    }else{
+        $order->add_order_note('No response from ShipHawk');
     }
 }
 
