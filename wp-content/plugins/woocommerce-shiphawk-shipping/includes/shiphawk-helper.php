@@ -68,3 +68,13 @@ function log_me($message)
         }
     }
 }
+
+function version_check( $version = '2.6' ) {
+    if ( class_exists( 'WooCommerce' ) ) {
+        global $woocommerce;
+        if ( version_compare( $woocommerce->version, $version, ">=" ) ) {
+            return true;
+        }
+    }
+    return false;
+}

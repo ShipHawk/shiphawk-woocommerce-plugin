@@ -33,12 +33,14 @@ function init_shiphawk_shipping()
             $this->admin_page_heading       = __('ShipHawk Shipping', 'woocommerce');
             $this->admin_page_description   = __('ShipHawk Shipping', 'woocommerce');
             $this->method_description       = __('ShipHawk Shipping', 'woocommerce');
-            $this->supports              = array(
-                'shipping-zones',
-                'instance-settings',
-                'instance-settings-modal',
-                /*'settings',*/
-            );
+            if (version_check()) {
+                $this->supports             = array(
+                    'shipping-zones',
+                    'instance-settings',
+                    'instance-settings-modal',
+                    'settings'
+                );
+            }
 
             add_action('woocommerce_update_options_shipping_' . $this->id, array($this, 'process_admin_options'));
 
@@ -59,14 +61,19 @@ function init_shiphawk_shipping()
             $this->title            = 'ShipHawk Shipping';
 
             $this->manual_shipping  = $this->settings['manual_import_order'];
-            //$this->origin_postcode = $this->settings['origin_postcode'];
         }
 
         function init_form_fields()
         {
+            $instance_settings = array(
+                'enabled' => array(
+                    'title' => __('Enable/Disable', 'woocommerce'),
+                    'type' => 'checkbox',
+                    'label' => __('Enable this shipping method'),
+                    'default' => 'yes',
+                ));
 
-            //$this->form_fields = array(
-            $this->instance_form_fields = array(
+            $settings = array(
                 'enabled' => array(
                     'title' => __('Enable/Disable', 'woocommerce'),
                     'type' => 'checkbox',
@@ -109,6 +116,13 @@ function init_shiphawk_shipping()
                 )
 
             );
+
+            if (version_check()) {
+                $this->instance_form_fields = $instance_settings;
+                $this->form_fields = $settings;
+            } else {
+                $this->form_fields = $settings;
+            }
         }
 
         /*
@@ -121,6 +135,19 @@ function init_shiphawk_shipping()
             $cart_objct = $woocommerce->cart;
             $from_zip = get_option('woocommerce_store_postcode', '');
             $plugin_settings = get_option('woocommerce_shiphawk_shipping_settings');
+
+            if ($plugin_settings['enabled'] == 'no') {
+                return;
+            }
+
+            if (version_check()) {
+                $instance_enabled = $this->get_instance_option('enabled');
+
+                if ($instance_enabled == 'no') {
+                    return;
+                }
+            }
+
             if (empty($from_zip)) {
                 $from_zip = $plugin_settings['origin_postcode'];
             }
@@ -226,6 +253,7 @@ function action_woocommerce_settings_save()
 }
 
 add_action("woocommerce_settings_saved", 'action_woocommerce_settings_save', 10, 0);
+
 
 function show_shiphawk_error()
 {
@@ -381,11 +409,3 @@ function shiphook_shipping_deactivation()
 {
     wp_clear_scheduled_hook('shiphawk_import_orders');
 }
-
-/*function request_shipping_quote_shipping_method( $methods ) {
-    $methods['request_a_shipping_quote'] = 'shiphawk_shipping';
-
-    return $methods;
-}
-
-add_filter( 'woocommerce_shipping_methods', 'request_shipping_quote_shipping_method' );*/
